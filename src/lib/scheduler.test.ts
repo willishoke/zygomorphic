@@ -3,11 +3,17 @@ import { leafDescendants, buildDepGraph, epochs } from './scheduler.js';
 import type { NodeData } from './types.js';
 
 function leaf(id: string, deps: string[] = []): NodeData {
-  return { id, problem: id, parent_id: null, children: [], is_leaf: true, depth: 0, plan: null, dependencies: deps, schema: null };
+  return {
+    id, content: id, summary: '', parent_ids: [], children: [], depth: 0, exploration: [],
+    links: deps.map((d) => ({ target: d, relation: 'depends_on' })),
+  };
 }
 
 function branch(id: string, children: string[], deps: string[] = []): NodeData {
-  return { id, problem: id, parent_id: null, children, is_leaf: false, depth: 0, plan: null, dependencies: deps, schema: null };
+  return {
+    id, content: id, summary: '', parent_ids: [], children, depth: 0, exploration: [],
+    links: deps.map((d) => ({ target: d, relation: 'depends_on' })),
+  };
 }
 
 // ---------------------------------------------------------------------------
