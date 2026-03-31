@@ -6,8 +6,8 @@ import fs from 'fs';
 import path from 'path';
 import type { Orchestrator } from './orchestrator.js';
 
-// Resolve HTML relative to CWD (the viewer/ directory) so the same source
-// file is served whether running from source or from a compiled dist/.
+// Resolve HTML relative to CWD so the same source file is served whether
+// running from source or from a compiled dist/.
 const HTML_PATH = path.join(process.cwd(), 'src/web/index.html');
 
 let clients: http.ServerResponse[] = [];
@@ -65,10 +65,10 @@ export function createWebServer(port = 7777, orch?: Orchestrator): http.Server {
           res.end(JSON.stringify({ error: 'bad json' }));
           return;
         }
-        // Respond immediately; long-running actions run in background
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
-        dispatchAction(orch, action);
+        // Action dispatch will be re-wired for graph operations
+        console.log('action received:', action.type);
       });
       return;
     }
@@ -82,34 +82,6 @@ export function createWebServer(port = 7777, orch?: Orchestrator): http.Server {
 
   server.listen(port);
   return server;
-}
-
-function dispatchAction(orch: Orchestrator, action: Record<string, unknown>): void {
-  switch (action.type) {
-    case 'submit':
-      orch.submitQuery(String(action.query ?? '')).catch(console.error);
-      break;
-    case 'root_approve':
-      orch.approveRoot().catch(console.error);
-      break;
-    case 'root_refine':
-      orch.refineRoot(String(action.feedback ?? '')).catch(console.error);
-      break;
-    case 'node_approve':
-      orch.approveNode().catch(console.error);
-      break;
-    case 'node_refine':
-      orch.refineNode(String(action.feedback ?? '')).catch(console.error);
-      break;
-    case 'build':
-      orch.startBuild(Boolean(action.git));
-      break;
-    case 'back':
-      orch.back();
-      break;
-    default:
-      console.error('unknown action type:', action.type);
-  }
 }
 
 export function pushState(state: unknown): void {
