@@ -1,5 +1,5 @@
 {
-  "name": "anamorphic",
+  "name": "zygomorphic",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -12,8 +12,8 @@
     "test": "vitest run"
   },
   "build": {
-    "appId": "com.anamorphic.app",
-    "productName": "Anamorphic",
+    "appId": "com.zygomorphic.app",
+    "productName": "Zygomorphic",
     "icon": "assets/icon.png",
     "directories": {
       "output": "dist/packages"

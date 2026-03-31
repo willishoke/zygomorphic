@@ -17,7 +17,7 @@ app.whenReady().then(async () => {
   win = new BrowserWindow({
     width: 1280,
     height: 900,
-    title: 'anamorphic',
+    title: 'zygomorphic',
     backgroundColor: '#0d1117',
     webPreferences: {
       nodeIntegration: false,
