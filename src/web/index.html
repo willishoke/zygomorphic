@@ -30,1111 +30,493 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
-
-@media (max-width: 768px) {
-  body { height: auto; min-height: 100vh; overflow: auto; }
-  main { flex-direction: column; overflow: visible; }
-  .sidebar { width: 100%; max-height: 40vh; border-right: none; border-bottom: 1px solid var(--border); }
-  .content { overflow: visible; }
-}
-
-/* ── Header ── */
 header {
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  padding: 10px 20px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
   flex-shrink: 0;
 }
-header .logo { color: var(--cyan); font-weight: 700; font-size: 14px; letter-spacing: .5px; }
-header .screen { color: var(--dim); font-size: 12px; }
-header .pill {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  color: var(--dim);
-}
-.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); margin-left: auto; }
-.pulse.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: glow 2s ease-in-out infinite; }
-@keyframes glow { 0%,100%{opacity:1} 50%{opacity:.5} }
-.demo-banner {
-  background: color-mix(in srgb, var(--yellow) 12%, transparent);
-  border-bottom: 1px solid var(--yellow);
-  color: var(--yellow);
-  font-size: 11px;
-  text-align: center;
-  padding: 5px 12px;
-  letter-spacing: .4px;
-  flex-shrink: 0;
-}
+header .logo { font-weight: 700; font-size: 15px; color: var(--cyan); }
+header .status { color: var(--dim); font-size: 12px; }
+header .node-count { color: var(--dim); font-size: 12px; margin-left: auto; }
 
-/* ── Layout ── */
-main { flex: 1; display: flex; overflow: hidden; }
-
-/* ── Sidebar ── */
-.sidebar {
-  width: 260px;
+/* ---- Miller columns layout ---- */
+.miller-viewport {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+}
+.miller-column {
+  min-width: 280px;
+  max-width: 350px;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
-  padding: 12px 8px;
 }
-.sidebar-title { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; padding: 0 8px 8px; }
-
-/* ── Tree nodes ── */
-.tree-node { }
-.tree-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background .1s;
-}
-.tree-row:hover { background: var(--bg3); }
-.tree-row.selected { background: var(--bg3); border: 1px solid var(--border); }
-.tree-row.active { background: color-mix(in srgb, var(--cyan) 12%, transparent); border: 1px solid var(--cyan); }
-.tree-children { margin-left: 20px; border-left: 1px solid var(--border); padding-left: 6px; margin-top: 1px; margin-bottom: 1px; }
-.node-icon { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.node-icon.internal { background: var(--blue); }
-.node-icon.leaf     { background: var(--yellow); border-radius: 2px; }
-.node-icon.running  { background: var(--cyan); animation: spin-pulse 1s ease-in-out infinite; }
-.node-icon.done     { background: var(--green); border-radius: 2px; }
-.node-icon.error    { background: var(--red); }
-.node-icon.waiting  { background: var(--bg3); border: 1px solid var(--border); }
-@keyframes spin-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.4)} }
-.node-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-size: 12px; }
-.node-meta  { font-size: 10px; color: var(--dim); flex-shrink: 0; }
-
-/* ── Content ── */
-.content { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-
-/* ── Cards ── */
-.card {
+.miller-column.focal {
+  min-width: 400px;
+  max-width: 500px;
   background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
 }
-.card-header {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
+.miller-column.faded { opacity: 0.6; }
+
+.column-header {
+  padding: 8px 12px;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: .7px;
+  letter-spacing: 0.5px;
   color: var(--dim);
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
-.card-body { padding: 14px; }
-
-/* ── Interactive controls ── */
-.action-panel {
+.column-header.focal-header {
+  color: var(--cyan);
   background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
-.action-buttons { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.btn {
-  font-family: inherit;
-  font-size: 12px;
-  padding: 6px 14px;
-  border-radius: 5px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: opacity .1s, filter .1s;
-  letter-spacing: .2px;
-}
-.btn:hover:not(:disabled):not(.btn-pending) { filter: brightness(1.15); }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
-.btn:active { opacity: .45; }
-.btn-pending { pointer-events: none; cursor: default; opacity: .45; }
-.thinking-status { color: var(--dim); font-size: 12px; }
-.btn-primary { background: var(--cyan); color: var(--bg); border-color: var(--cyan); font-weight: 600; }
-.btn-success { background: var(--green); color: var(--bg); border-color: var(--green); font-weight: 600; }
-.btn-secondary { background: var(--bg3); color: var(--text); border-color: var(--border); }
-.btn-ghost { background: transparent; color: var(--dim); border-color: transparent; }
-.btn-danger { background: transparent; color: var(--red); border-color: var(--red); }
-.refine-row { display: flex; gap: 8px; }
-.input-text {
-  flex: 1;
-  font-family: inherit;
-  font-size: 12px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  color: var(--text);
-  padding: 6px 10px;
-  outline: none;
-  transition: border-color .15s;
-}
-.input-text:focus { border-color: var(--cyan); }
-.input-text::placeholder { color: var(--dim); }
-.input-large {
-  font-family: inherit;
-  font-size: 13px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
+
+/* ---- Node items in columns ---- */
+.node-item {
   padding: 10px 12px;
-  outline: none;
-  resize: vertical;
-  min-height: 80px;
-  width: 100%;
-  line-height: 1.6;
-  transition: border-color .15px;
-}
-.input-large:focus { border-color: var(--cyan); }
-.input-large::placeholder { color: var(--dim); }
-.error-msg {
-  color: var(--red);
-  font-size: 12px;
-  padding: 6px 0;
-}
-.loading-text { color: var(--dim); font-size: 12px; }
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position:  200% 0; }
-}
-.skeleton {
-  background: linear-gradient(90deg, var(--bg3) 25%, var(--border) 50%, var(--bg3) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.8s ease-in-out infinite;
-  border-radius: 3px;
-  height: 11px;
-  margin-bottom: 7px;
-}
-.skeleton-group { margin-top: 14px; }
-.loading-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 28px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--dim);
-  font-size: 13px;
-}
-.loading-spinner {
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  background: var(--cyan);
-  animation: spin-pulse 1s ease-in-out infinite;
-  flex-shrink: 0;
-}
-.thinking-dots::after {
-  content: '';
-  animation: thinking-ellipsis 1.2s steps(4, end) infinite;
-}
-@keyframes thinking-ellipsis {
-  0%   { content: ''; }
-  25%  { content: '.'; }
-  50%  { content: '..'; }
-  75%  { content: '...'; }
-  100% { content: ''; }
-}
-
-/* ── Input screen ── */
-.input-screen {
-  max-width: 600px;
-  margin: 40px auto 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.input-screen .tagline {
-  color: var(--dim);
-  font-size: 12px;
-  margin-bottom: 4px;
-  line-height: 1.6;
-}
-
-/* ── Build progress ── */
-.epoch-section { margin-bottom: 16px; }
-.epoch-heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.badge {
-  font-size: 10px;
-  padding: 1px 7px;
-  border-radius: 10px;
-  background: var(--bg3);
-  color: var(--dim);
-  border: 1px solid var(--border);
-}
-.badge.active { background: var(--cyan); color: var(--bg); border-color: var(--cyan); }
-.badge.done   { background: var(--green); color: var(--bg); border-color: var(--green); }
-.build-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s;
 }
-.build-row:last-child { border-bottom: none; }
-.build-icon { width: 16px; text-align: center; font-size: 13px; flex-shrink: 0; }
-.build-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.build-right { color: var(--dim); font-size: 11px; flex-shrink: 0; }
-.build-branch { color: var(--purple); font-size: 11px; }
-
-/* ── Detail view ── */
-.detail-problem { font-size: 14px; font-weight: 600; margin-bottom: 12px; line-height: 1.5; }
-.detail-section { margin-bottom: 12px; }
-.detail-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--dim); margin-bottom: 6px; }
-.detail-item { padding: 3px 0; display: flex; gap: 8px; }
-.detail-item::before { content: '·'; color: var(--dim); flex-shrink: 0; }
-.detail-code { font-size: 12px; color: var(--cyan); background: var(--bg3); padding: 2px 6px; border-radius: 3px; display: block; margin: 2px 0; }
-.tag { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px; margin-right: 4px; }
-.tag.leaf { background: color-mix(in srgb, var(--yellow) 15%, transparent); color: var(--yellow); border: 1px solid var(--yellow); }
-.tag.internal { background: color-mix(in srgb, var(--blue) 15%, transparent); color: var(--blue); border: 1px solid var(--blue); }
-.tag.decompose { background: color-mix(in srgb, var(--purple) 15%, transparent); color: var(--purple); border: 1px solid var(--purple); }
-
-/* ── Waiting ── */
-.empty { text-align: center; padding: 60px 20px; color: var(--dim); line-height: 2; }
-.empty .big { font-size: 32px; margin-bottom: 12px; }
-
-/* ── Sidebar tabs ── */
-.sidebar-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 0 8px 10px;
+.node-item:hover { background: var(--bg3); }
+.node-item.selected { background: var(--bg3); border-left: 3px solid var(--cyan); }
+.node-item .node-id {
+  font-size: 11px;
+  color: var(--dim);
+  margin-bottom: 2px;
 }
-.sidebar-tab {
-  flex: 1;
-  text-align: center;
+.node-item .node-summary {
+  color: var(--text);
+  line-height: 1.4;
+}
+.node-item .node-meta {
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 4px;
+}
+.node-item .link-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--bg3);
+  color: var(--purple);
+  margin-left: 4px;
+}
+.node-item .children-count {
+  color: var(--blue);
+}
+
+/* ---- Focal node detail ---- */
+.focal-detail {
+  padding: 16px;
+}
+.focal-detail .focal-id {
+  font-size: 11px;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
+.focal-detail .focal-summary {
+  font-size: 14px;
+  color: var(--cyan);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+.focal-detail .focal-content {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: var(--text);
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.focal-detail .focal-links {
+  margin-top: 12px;
+}
+.focal-detail .focal-links h4 {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: .7px;
-  padding: 4px 0;
-  border-radius: 4px;
-  cursor: pointer;
   color: var(--dim);
-  border: 1px solid transparent;
-  transition: all .1s;
+  margin-bottom: 6px;
 }
-.sidebar-tab:hover { color: var(--text); }
-.sidebar-tab.active { color: var(--text); border-color: var(--border); background: var(--bg3); }
+.focal-link-item {
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--purple);
+}
+.focal-link-item:hover { text-decoration: underline; }
+.focal-detail .focal-exploration {
+  margin-top: 12px;
+}
+.focal-detail .focal-exploration h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.exploration-entry {
+  font-size: 12px;
+  color: var(--dim);
+  padding: 2px 0;
+}
 
-/* ── Epoch sidebar ── */
-.epoch-group { margin-bottom: 6px; }
-.epoch-group-header {
+/* ---- Empty state ---- */
+.empty-state {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
+  justify-content: center;
   color: var(--dim);
-  text-transform: uppercase;
-  letter-spacing: .6px;
-  transition: background .1s;
+  font-size: 14px;
 }
-.epoch-group-header:hover { background: var(--bg3); }
-.epoch-group-nodes { margin-left: 8px; border-left: 1px solid var(--border); padding-left: 6px; margin-top: 1px; }
-
-/* ── Stats bar ── */
-.stats { display: flex; gap: 16px; font-size: 12px; color: var(--dim); padding: 10px 14px; background: var(--bg2); border-top: 1px solid var(--border); flex-shrink: 0; }
-.stats span b { color: var(--text); }
 </style>
 </head>
 <body>
 
-<div class="demo-banner" id="demo-banner" style="display:none">demo mode — <a href="https://github.com/willishoke/zygomorphic" style="color:var(--yellow)">run locally</a> to use interactively</div>
 <header>
   <span class="logo">zygomorphic</span>
-  <span class="screen" id="hdr-screen">connecting…</span>
-  <span class="pill" id="hdr-pill" style="display:none"></span>
-  <div class="pulse" id="pulse"></div>
+  <span class="status" id="hdr-status">connecting…</span>
+  <span class="node-count" id="hdr-count"></span>
 </header>
 
-<main>
-  <div class="sidebar" id="sidebar" style="display:none">
-    <div class="sidebar-tabs">
-      <div class="sidebar-tab active" id="tab-tree" onclick="setTab('tree')">tree</div>
-      <div class="sidebar-tab" id="tab-epochs" onclick="setTab('epochs')">epochs</div>
-    </div>
-    <div id="sidebar-tree"><div class="empty" style="padding:20px"><div>no tree yet</div></div></div>
-    <div id="sidebar-epochs" style="display:none"><div class="empty" style="padding:20px"><div>no epochs yet</div></div></div>
-  </div>
-  <div class="content" id="content">
-    <div class="empty">
-      <div class="big">○</div>
-      <div>connecting…</div>
-    </div>
-  </div>
-</main>
-
-<div class="stats" id="stats" style="display:none"></div>
+<div class="miller-viewport" id="viewport">
+  <div class="empty-state" id="empty-state">no graph loaded</div>
+</div>
 
 <script>
-// ── demo state ────────────────────────────────────────────────────────────────
-const DEMO_STATE = {
-  screen: 'building',
-  loading: false,
-  tree: {
-    root_id: 'n0',
-    nodes: {
-      n0: { id:'n0', problem:'Build a URL shortener service', parent_id:null, children:['n1','n2','n3'], is_leaf:false, depth:0, plan:null, dependencies:[], schema:null },
-      n1: { id:'n1', problem:'HTTP server & routing layer', parent_id:'n0', children:['n4','n5'], is_leaf:false, depth:1, plan:null, dependencies:[], schema:null },
-      n2: { id:'n2', problem:'Storage & redirect logic', parent_id:'n0', children:['n6','n7'], is_leaf:false, depth:1, plan:null, dependencies:[], schema:null },
-      n3: { id:'n3', problem:'Analytics & click tracking', parent_id:'n0', children:['n8'], is_leaf:false, depth:1, plan:null, dependencies:['n2'], schema:null },
-      n4: { id:'n4', problem:'Parse & validate incoming requests', parent_id:'n1', children:[], is_leaf:true, depth:2, plan:null, dependencies:[], schema:{ summary:'Validates URLs, extracts slugs, returns structured request objects.', functions:[{name:'parseRequest',signature:'parseRequest(req: Request): ParsedReq',purpose:'Decode path, query params, and body'},{name:'validateUrl',signature:'validateUrl(raw: string): URL | null',purpose:'Reject malformed or disallowed URLs'}], estimated_lines:80 }},
-      n5: { id:'n5', problem:'Route dispatch & middleware chain', parent_id:'n1', children:[], is_leaf:true, depth:2, plan:null, dependencies:['n4'], schema:{ summary:'Chains auth, rate-limit, and handler middleware; dispatches to correct route.', functions:[{name:'buildRouter',signature:'buildRouter(handlers: HandlerMap): Router',purpose:'Wire routes to handlers'},{name:'applyMiddleware',signature:'applyMiddleware(...mw: Middleware[]): Handler',purpose:'Compose middleware left-to-right'}], estimated_lines:110 }},
-      n6: { id:'n6', problem:'KV store adapter (Redis / in-memory)', parent_id:'n2', children:[], is_leaf:true, depth:2, plan:null, dependencies:[], schema:{ summary:'Abstract KV interface with Redis and in-memory backends.', functions:[{name:'get',signature:'get(key: string): Promise<string | null>',purpose:'Fetch value by key'},{name:'set',signature:'set(key: string, val: string, ttl?: number): Promise<void>',purpose:'Store with optional TTL'}], data_structures:[{name:'KVAdapter',fields:[{name:'get',type:'(key: string) => Promise<string|null>'},{name:'set',type:'(key: string, val: string, ttl?: number) => Promise<void>'}]}], estimated_lines:140 }},
-      n7: { id:'n7', problem:'Slug generation & collision avoidance', parent_id:'n2', children:[], is_leaf:true, depth:2, plan:null, dependencies:['n6'], schema:{ summary:'Generates short slugs, retries on collision, supports custom aliases.', functions:[{name:'generateSlug',signature:'generateSlug(url: string, opts?: SlugOpts): Promise<string>',purpose:'Create a unique short code'},{name:'checkCollision',signature:'checkCollision(slug: string, store: KVAdapter): Promise<boolean>',purpose:'Return true if slug is already taken'}], steps:['Generate 6-char base58 slug','Check KV for collision','Retry up to 5×, then expand to 8 chars','Persist mapping and return slug'], edge_cases:['Custom alias already taken','KV unavailable during check'], estimated_lines:95 }},
-      n8: { id:'n8', problem:'Click event ingestion & aggregation', parent_id:'n3', children:[], is_leaf:true, depth:2, plan:null, dependencies:['n6'], schema:{ summary:'Records click events asynchronously; aggregates counts per slug.', functions:[{name:'recordClick',signature:'recordClick(slug: string, meta: ClickMeta): void',purpose:'Fire-and-forget click recording'},{name:'getCounts',signature:'getCounts(slug: string): Promise<ClickStats>',purpose:'Return total and windowed click counts'}], estimated_lines:120 }},
-    }
-  },
-  traversalNodeId: null,
-  buildProgress: {
-    gitEnabled: true,
-    activeEpoch: 2,
-    done: true,
-    outputDir: './output/url-shortener',
-    epochs: [
-      { nodes: [
-        { nodeId:'n4', problem:'Parse & validate incoming requests', status:'done', branchName:'feat/parse-validate-incoming-requests', commitCount:3 },
-        { nodeId:'n6', problem:'KV store adapter (Redis / in-memory)', status:'done', branchName:'feat/kv-store-adapter-redis-in-memory', commitCount:4 },
-      ]},
-      { nodes: [
-        { nodeId:'n5', problem:'Route dispatch & middleware chain', status:'done', branchName:'feat/route-dispatch-middleware-chain', commitCount:3 },
-        { nodeId:'n7', problem:'Slug generation & collision avoidance', status:'done', branchName:'feat/slug-generation-collision-avoidance', commitCount:5 },
-      ]},
-      { nodes: [
-        { nodeId:'n8', problem:'Click event ingestion & aggregation', status:'done', branchName:'feat/click-event-ingestion-aggregation', commitCount:3 },
-      ]},
-    ]
-  }
-};
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const trunc = (s, n) => s.length > n ? s.slice(0, n) + '…' : s;
+let state = null;
+let focusId = null;
 
-// ── state ─────────────────────────────────────────────────────────────────────
-let state = {};
-let selectedId = null;
-let sidebarTab = 'tree';
-let demoMode = false;
-let everConnected = false;
-let pendingAction = null;
-let lastTreeKey = null;
-let lastBuildKey = null;
+// ---------------------------------------------------------------------------
+// SSE connection
+// ---------------------------------------------------------------------------
 
-function setTab(tab) {
-  sidebarTab = tab;
-  document.getElementById('tab-tree').className   = 'sidebar-tab' + (tab === 'tree'   ? ' active' : '');
-  document.getElementById('tab-epochs').className = 'sidebar-tab' + (tab === 'epochs' ? ' active' : '');
-  document.getElementById('sidebar-tree').style.display   = tab === 'tree'   ? '' : 'none';
-  document.getElementById('sidebar-epochs').style.display = tab === 'epochs' ? '' : 'none';
-}
-
-// ── action dispatch ──────────────────────────────────────────────────────────
-async function sendAction(action) {
-  if (demoMode) return;
-  pendingAction = action.type;
-  renderContent();
-  try {
-    await fetch('/action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(action),
-    });
-  } catch (e) {
-    pendingAction = null;
-    renderContent();
-    console.error('action failed', e);
-  }
-}
-
-function submitQuery() {
-  const el = document.getElementById('query-input');
-  const q = el ? el.value.trim() : '';
-  if (!q) return;
-  sendAction({ type: 'submit', query: q });
-}
-
-function handleQueryKeydown(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    submitQuery();
-  }
-}
-
-function handleRefineKeydown(e, type) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    sendRefine(type);
-  }
-}
-
-function sendRefine(type) {
-  const el = document.getElementById('refine-input');
-  const f = el ? el.value.trim() : '';
-  if (!f) return;
-  el.value = '';
-  sendAction({ type, feedback: f });
-}
-
-function startBuild(git) {
-  sendAction({ type: 'build', git });
-}
-
-// ── node status from build progress ──────────────────────────────────────────
-function nodeStatus(nodeId) {
-  const bp = state.buildProgress;
-  if (!bp) return null;
-  for (const epoch of bp.epochs) {
-    const n = epoch.nodes.find(n => n.nodeId === nodeId);
-    if (n) return n.status;
-  }
-  return null;
-}
-
-function nodeBuildInfo(nodeId) {
-  const bp = state.buildProgress;
-  if (!bp) return null;
-  for (const epoch of bp.epochs) {
-    const n = epoch.nodes.find(n => n.nodeId === nodeId);
-    if (n) return n;
-  }
-  return null;
-}
-
-// ── tree sidebar ─────────────────────────────────────────────────────────────
-function renderTreeNode(tree, nodeId, depth) {
-  const node = tree.nodes[nodeId];
-  if (!node) return '';
-  const status = nodeStatus(nodeId);
-  const isCurrent = nodeId === state.traversalNodeId;
-  const isSelected = nodeId === selectedId;
-
-  let iconClass = node.is_leaf ? 'leaf' : 'internal';
-  if (status) iconClass = status;
-  else if (isCurrent) iconClass = 'running';
-
-  const rowClass = isCurrent ? 'active' : isSelected ? 'selected' : '';
-  const label = trunc(node.problem, 28);
-  const meta = node.is_leaf ? '●' : `+${node.children.length}`;
-
-  const children = node.children.map(id => renderTreeNode(tree, id, depth + 1)).join('');
-  return `
-    <div class="tree-node">
-      <div class="tree-row ${rowClass}" data-node-id="${nodeId}" onclick="selectNode('${nodeId}')">
-        <div class="node-icon ${iconClass}"></div>
-        <span class="node-label" title="${esc(node.problem)}">${esc(label)}</span>
-        <span class="node-meta">${meta}</span>
-      </div>
-      ${children ? `<div class="tree-children">${children}</div>` : ''}
-    </div>`;
-}
-
-function selectNode(id) {
-  selectedId = selectedId === id ? null : id;
-
-  // Update tree row highlight without rebuilding the DOM
-  document.querySelectorAll('.tree-row[data-node-id]').forEach(el => {
-    const nid = el.dataset.nodeId;
-    const isCurrent = nid === state.traversalNodeId;
-    el.className = 'tree-row' + (isCurrent ? ' active' : nid === selectedId ? ' selected' : '');
-  });
-
-  // Re-render content area only (not the sidebar tree)
-  const { screen, tree, buildProgress } = state;
-  const content = document.getElementById('content');
-  const queryVal  = document.getElementById('query-input')?.value  ?? '';
-  const refineVal = document.getElementById('refine-input')?.value ?? '';
-
-  if (screen === 'explore') {
-    content.innerHTML = renderExploreContent();
-  } else if (screen === 'traversing') {
-    content.innerHTML = renderTraversalScreen();
-  } else if (screen === 'building' && buildProgress) {
-    content.innerHTML = renderBuildingScreen();
-    updateStats(buildProgress);
-  }
-
-  const qi = document.getElementById('query-input');
-  if (qi && queryVal) qi.value = queryVal;
-  const ri = document.getElementById('refine-input');
-  if (ri && refineVal) ri.value = refineVal;
-}
-
-// ── epoch sidebar ────────────────────────────────────────────────────────────
-function renderEpochSidebar(tree, bp) {
-  if (!bp || !bp.epochs.length) return '<div class="empty" style="padding:20px"><div>no epochs yet</div></div>';
-
-  return bp.epochs.map((epoch, ei) => {
-    const isActive = ei === bp.activeEpoch;
-    const isPast   = ei <  bp.activeEpoch;
-    const badgeClass = isActive ? 'active' : isPast ? 'done' : '';
-    const badgeLabel = isActive ? 'running' : isPast ? 'done' : 'waiting';
-    const colors = { waiting:'var(--dim)', running:'var(--cyan)', done:'var(--green)', error:'var(--red)' };
-    const icons  = { waiting:'○', running:'◉', done:'✓', error:'✗' };
-
-    const nodes = epoch.nodes.map(n => {
-      const isSelected = n.nodeId === selectedId;
-      const color = colors[n.status] ?? 'var(--dim)';
-      const icon  = icons[n.status]  ?? '○';
-      return `
-        <div class="tree-row${isSelected ? ' selected' : ''}" data-node-id="${n.nodeId}" onclick="selectNode('${n.nodeId}')">
-          <span style="color:${color};font-size:12px;width:12px;flex-shrink:0">${icon}</span>
-          <span class="node-label" title="${esc(n.problem)}">${esc(trunc(n.problem, 26))}</span>
-        </div>`;
-    }).join('');
-
-    return `
-      <div class="epoch-group">
-        <div class="epoch-group-header">
-          epoch ${ei + 1}
-          <span class="badge ${badgeClass}">${badgeLabel}</span>
-          <span style="margin-left:auto;font-size:10px">${epoch.nodes.length}</span>
-        </div>
-        <div class="epoch-group-nodes">${nodes}</div>
-      </div>`;
-  }).join('');
-}
-
-// ── build progress ─────────────────────────────────────────────────────────
-function renderBuildingScreen() {
-  const { tree, buildProgress: bp } = state;
-  if (!bp) return '';
-  const headerColor = bp.gitEnabled ? 'var(--purple)' : 'var(--cyan)';
-  const headerLabel = bp.gitEnabled ? 'building with git' : 'building';
-  const body = (selectedId && tree?.nodes?.[selectedId])
-    ? renderNodeDetail(tree, selectedId)
-    : renderBuild(bp);
-  return `
-    <div class="card-header" style="font-size:12px;letter-spacing:.5px;padding:0 0 12px;color:${headerColor}">${headerLabel}</div>
-    ${body}
-    ${bp.done ? `<div class="action-panel"><button class="btn btn-ghost" onclick="sendAction({type:'back'})">← back to explore</button></div>` : ''}`;
-}
-
-function renderBuild(bp) {
-  let html = '';
-  bp.epochs.forEach((epoch, ei) => {
-    const isActive = ei === bp.activeEpoch;
-    const isPast   = ei <  bp.activeEpoch;
-    const badgeClass = isActive ? 'active' : isPast ? 'done' : '';
-    const badgeLabel = isActive ? 'running' : isPast ? 'done' : 'waiting';
-
-    html += `<div class="epoch-section">
-      <div class="epoch-heading">
-        <span>Epoch ${ei + 1} / ${bp.epochs.length}</span>
-        <span class="badge ${badgeClass}">${badgeLabel}</span>
-      </div>
-      <div class="card">
-        <div class="card-body" style="padding:8px 14px">`;
-
-    epoch.nodes.forEach(n => {
-      const icons  = { waiting:'○', running:'◉', done:'✓', error:'✗' };
-      const colors = { waiting:'var(--dim)', running:'var(--cyan)', done:'var(--green)', error:'var(--red)' };
-      const icon   = icons[n.status]  ?? '○';
-      const color  = colors[n.status] ?? 'var(--dim)';
-      const right  = n.status === 'running'
-        ? (n.gitStep ?? 'generating…') + (n.commitCount ? `  ${n.commitCount} commits` : '')
-        : n.status === 'done'
-        ? (n.branchName ? `<span class="build-branch">${esc(trunc(n.branchName, 30))}</span>` + (n.commitCount ? ` · ${n.commitCount}` : '') : '')
-        : n.status === 'error' ? `<span style="color:var(--red)">${esc(trunc(n.error??'',30))}</span>` : '';
-
-      html += `<div class="build-row">
-        <span class="build-icon" style="color:${color}">${icon}</span>
-        <span class="build-name">${esc(trunc(n.problem, 44))}</span>
-        <span class="build-right">${right}</span>
-      </div>`;
-    });
-
-    html += `</div></div></div>`;
-  });
-
-  if (bp.done) {
-    const allNodes = bp.epochs.flatMap(e => e.nodes);
-    const errors = allNodes.filter(n => n.status === 'error').length;
-    const summary = errors > 0
-      ? `<span style="color:var(--yellow)">⚠ complete — ${errors} error(s)</span>`
-      : `<span style="color:var(--green)">✓ build complete</span>`;
-    html += `<div style="text-align:center;padding:12px;font-size:13px">${summary}</div>`;
-  }
-
-  if (bp.fatalError) {
-    html += `<div class="card" style="border-color:var(--red)"><div class="card-body" style="color:var(--red)">${esc(bp.fatalError)}</div></div>`;
-  }
-
-  return html;
-}
-
-// ── node detail ────────────────────────────────────────────────────────────
-function renderNodeDetailBody(node) {
-  let html = '';
-  const buildInfo = nodeBuildInfo(node.id);
-
-  if (buildInfo) {
-    const colors = { waiting:'var(--dim)', running:'var(--cyan)', done:'var(--green)', error:'var(--red)' };
-    const color = colors[buildInfo.status] ?? 'var(--dim)';
-    html += `<div style="color:${color};margin-bottom:8px;font-size:12px">`;
-    if (buildInfo.status === 'running') html += `◉ ${buildInfo.gitStep ?? 'generating…'}`;
-    if (buildInfo.status === 'done')    html += `✓ done`;
-    if (buildInfo.status === 'error')   html += `✗ ${esc(buildInfo.error ?? 'error')}`;
-    if (buildInfo.status === 'waiting') html += `○ waiting`;
-    if (buildInfo.commitCount) html += `  · ${buildInfo.commitCount} commits`;
-    if (buildInfo.branchName)  html += `<div class="build-branch" style="margin-top:4px">${esc(buildInfo.branchName)}</div>`;
-    html += `</div>`;
-  }
-
-  if (node.schema) {
-    const s = node.schema;
-    if (s.summary) html += `<div style="color:var(--dim);margin-bottom:10px;font-size:12px;line-height:1.5">${esc(s.summary)}</div>`;
-
-    if (s.functions?.length) {
-      html += `<div class="detail-section"><h3>functions</h3>`;
-      s.functions.forEach(f => {
-        html += `<code class="detail-code">${esc(f.signature)}</code>`;
-        if (f.purpose) html += `<div style="color:var(--dim);font-size:11px;padding-left:6px;margin-bottom:4px">${esc(f.purpose)}</div>`;
-      });
-      html += `</div>`;
-    }
-
-    if (s.steps?.length) {
-      html += `<div class="detail-section"><h3>steps</h3>`;
-      s.steps.forEach(step => html += `<div class="detail-item">${esc(step)}</div>`);
-      html += `</div>`;
-    }
-
-    if (s.edge_cases?.length) {
-      html += `<div class="detail-section"><h3>edge cases</h3>`;
-      s.edge_cases.forEach(ec => html += `<div class="detail-item">${esc(ec)}</div>`);
-      html += `</div>`;
-    }
-
-    if (s.data_structures?.length) {
-      html += `<div class="detail-section"><h3>data structures</h3>`;
-      s.data_structures.forEach(ds => {
-        html += `<code class="detail-code">${esc(ds.name)}</code>`;
-        if (ds.fields?.length) ds.fields.forEach(f => html += `<div style="color:var(--dim);font-size:11px;padding-left:6px">${esc(f.name)}: ${esc(f.type)}</div>`);
-      });
-      html += `</div>`;
-    }
-
-    if (s.estimated_lines) html += `<div style="color:var(--dim);font-size:11px;margin-top:8px">~${s.estimated_lines} lines estimated</div>`;
-  }
-
-  if (node.children?.length) {
-    html += `<div class="detail-section" style="margin-top:12px"><h3>children (${node.children.length})</h3>`;
-    node.children.forEach(cid => {
-      const child = state.tree?.nodes?.[cid];
-      if (child) html += `<div class="detail-item">${esc(trunc(child.problem, 60))}</div>`;
-    });
-    html += `</div>`;
-  }
-
-  return html;
-}
-
-function renderNodeDetail(tree, nodeId) {
-  const node = tree?.nodes?.[nodeId];
-  if (!node) return '<div class="empty"><div>select a node</div></div>';
-
-  const typeTag = node.is_leaf
-    ? '<span class="tag leaf">leaf</span>'
-    : '<span class="tag internal">internal</span>';
-  const depthTag = `<span class="tag" style="background:var(--bg3);color:var(--dim);border:1px solid var(--border)">depth ${node.depth}</span>`;
-
-  return `
-    <div class="card">
-      <div class="card-header">node ${esc(nodeId)} ${typeTag} ${depthTag}</div>
-      <div class="card-body">
-        <div class="detail-problem">${esc(node.problem)}</div>
-        ${renderNodeDetailBody(node)}
-      </div>
-    </div>`;
-}
-
-// ── screen renderers ─────────────────────────────────────────────────────────
-
-function renderInputScreen() {
-  const loading = state.loading;
-  const error   = state.error;
-  return `
-    <div class="input-screen">
-      <div class="tagline">describe a software system to build → get a decomposition tree + parallel implementation plan</div>
-      <textarea id="query-input" class="input-large" placeholder="Build a URL shortener service…" rows="4" ${loading ? 'disabled' : ''} onkeydown="handleQueryKeydown(event)"></textarea>
-      ${error ? `<div class="error-msg">${esc(error)}</div>` : ''}
-      <div class="action-buttons">
-        <button class="btn btn-primary ${loading ? 'btn-pending' : ''}" onclick="submitQuery()">analyze →</button>
-        ${loading ? '<span class="thinking-status thinking-dots">thinking</span>' : ''}
-      </div>
-    </div>`;
-}
-
-function renderRootReview() {
-  const { rootProblem, rootAnalysis, loading, error } = state;
-
-  if (loading) {
-    const label = pendingAction === 'root_approve' ? 'decomposing…'
-                : pendingAction === 'root_refine'  ? 'refining…'
-                : 'analyzing…';
-    return `<div class="loading-card"><div class="loading-spinner"></div>${label}</div>`;
-  }
-
-  let analysisHtml = '';
-  if (rootAnalysis) {
-    const a = rootAnalysis;
-    if (a.problem_statement) {
-      analysisHtml += `<div class="detail-section"><h3>problem</h3><div style="line-height:1.6">${esc(a.problem_statement)}</div></div>`;
-    }
-    if (a.key_components?.length) {
-      analysisHtml += `<div class="detail-section"><h3>key components</h3>`;
-      a.key_components.forEach(c => { analysisHtml += `<div class="detail-item">${esc(c)}</div>`; });
-      analysisHtml += `</div>`;
-    }
-    if (a.scope_assessment) {
-      analysisHtml += `<div class="detail-section"><h3>scope</h3><div style="color:var(--dim);line-height:1.6">${esc(a.scope_assessment)}</div></div>`;
-    }
-  }
-
-  return `
-    <div class="card">
-      <div class="card-header">root analysis · <span style="color:var(--text)">${esc(trunc(rootProblem ?? '', 50))}</span></div>
-      <div class="card-body">
-        ${analysisHtml || '<div class="loading-text">no analysis yet</div>'}
-        ${error ? `<div class="error-msg" style="margin-top:8px">${esc(error)}</div>` : ''}
-      </div>
-    </div>
-    ${!loading ? `
-    <div class="action-panel">
-      <div class="action-buttons">
-        <button class="btn btn-ghost" onclick="sendAction({type:'back'})">← back</button>
-        <button class="btn btn-success ${pendingAction === 'root_approve' ? 'btn-pending' : ''}" onclick="sendAction({type:'root_approve'})" ${pendingAction && pendingAction !== 'root_approve' ? 'disabled' : ''}>approve & decompose →</button>
-        ${pendingAction === 'root_approve' ? '<span class="thinking-status thinking-dots">thinking</span>' : ''}
-      </div>
-      <div class="refine-row">
-        <input type="text" id="refine-input" class="input-text" placeholder="What should change? e.g. focus only on the API layer" ${pendingAction ? 'disabled' : ''} onkeydown="handleRefineKeydown(event, 'root_refine')">
-        <button class="btn btn-secondary" onclick="sendRefine('root_refine')" ${pendingAction ? 'disabled' : ''}>refine</button>
-      </div>
-    </div>` : ''}`;
-}
-
-function renderTraversalScreen() {
-  const { traversal, loading, error } = state;
-  if (!traversal && !loading) return '<div class="empty"><div>loading…</div></div>';
-
-  const { tree } = state;
-  const currentId = state.traversalNodeId;
-
-  // Always allow browsing other nodes — even while loading
-  if (selectedId && selectedId !== currentId && tree?.nodes?.[selectedId]) {
-    return `
-      ${renderNodeDetail(tree, selectedId)}
-      <div class="action-panel">
-        <button class="btn btn-ghost" onclick="selectNode('${currentId}')">← back to current node</button>
-      </div>`;
-  }
-
-  if (loading) {
-    const label = pendingAction === 'node_approve' ? 'decomposing…'
-                : pendingAction === 'node_refine'  ? 'refining…'
-                : 'thinking…';
-    const currentNode = tree?.nodes?.[currentId];
-    return `
-      <div class="card">
-        <div class="card-header" style="gap:8px">
-          <div class="loading-spinner"></div>
-          <span>${label}</span>
-        </div>
-        <div class="card-body">
-          ${currentNode ? `<div class="detail-problem">${esc(currentNode.problem)}</div>` : ''}
-          <div class="skeleton-group">
-            <div class="skeleton" style="width:88%"></div>
-            <div class="skeleton" style="width:72%"></div>
-            <div class="skeleton" style="width:80%"></div>
-          </div>
-        </div>
-      </div>`;
-  }
-
-  // User clicked a different node — peek view (non-loading)
-  if (selectedId && selectedId !== traversal?.nodeId && tree?.nodes?.[selectedId]) {
-    return `
-      ${renderNodeDetail(tree, selectedId)}
-      <div class="action-panel">
-        <button class="btn btn-ghost" onclick="selectNode('${traversal?.nodeId}')">← back to current node</button>
-      </div>`;
-  }
-
-  const nodeId   = traversal?.nodeId ?? '';
-  const problem  = traversal?.problem ?? '';
-  const isLeaf   = traversal?.isLeaf ?? false;
-  const qLen     = traversal?.queueLength ?? 0;
-  const seen     = traversal?.totalSeen ?? 0;
-
-  const typeTag = isLeaf
-    ? '<span class="tag leaf">leaf</span>'
-    : '<span class="tag decompose">will decompose</span>';
-
-  let bodyHtml = '';
-  if (isLeaf && traversal?.pendingSchema) {
-    const s = traversal.pendingSchema;
-    if (s.summary) bodyHtml += `<div style="color:var(--dim);margin-bottom:10px;font-size:12px;line-height:1.5">${esc(s.summary)}</div>`;
-    if (s.functions?.length) {
-      bodyHtml += `<div class="detail-section"><h3>functions</h3>`;
-      s.functions.forEach(f => {
-        bodyHtml += `<code class="detail-code">${esc(f.signature)}</code>`;
-        if (f.purpose) bodyHtml += `<div style="color:var(--dim);font-size:11px;padding-left:6px;margin-bottom:4px">${esc(f.purpose)}</div>`;
-      });
-      bodyHtml += `</div>`;
-    }
-    if (s.steps?.length) {
-      bodyHtml += `<div class="detail-section"><h3>steps</h3>`;
-      s.steps.forEach(step => bodyHtml += `<div class="detail-item">${esc(step)}</div>`);
-      bodyHtml += `</div>`;
-    }
-    if (s.edge_cases?.length) {
-      bodyHtml += `<div class="detail-section"><h3>edge cases</h3>`;
-      s.edge_cases.forEach(ec => bodyHtml += `<div class="detail-item">${esc(ec)}</div>`);
-      bodyHtml += `</div>`;
-    }
-    if (s.data_structures?.length) {
-      bodyHtml += `<div class="detail-section"><h3>data structures</h3>`;
-      s.data_structures.forEach(ds => {
-        bodyHtml += `<code class="detail-code">${esc(ds.name)}</code>`;
-        if (ds.fields?.length) ds.fields.forEach(f => bodyHtml += `<div style="color:var(--dim);font-size:11px;padding-left:6px">${esc(f.name)}: ${esc(f.type)}</div>`);
-      });
-      bodyHtml += `</div>`;
-    }
-    if (s.estimated_lines) bodyHtml += `<div style="color:var(--dim);font-size:11px;margin-top:8px">~${s.estimated_lines} lines estimated</div>`;
-  } else if (!isLeaf && traversal?.pendingSubproblems?.length) {
-    bodyHtml += `<div class="detail-section"><h3>subproblems (${traversal.pendingSubproblems.length})</h3>`;
-    traversal.pendingSubproblems.forEach((sp, i) => {
-      bodyHtml += `<div class="detail-item"><span style="color:var(--dim);margin-right:4px">${i+1}.</span>${esc(sp)}</div>`;
-    });
-    bodyHtml += `</div>`;
-  }
-
-  return `
-    <div class="card">
-      <div class="card-header">
-        ${typeTag}
-        <span style="color:var(--text)">${esc(trunc(nodeId, 6))}</span>
-        <span style="margin-left:auto;font-size:10px;color:var(--dim)">${seen} seen · ${qLen} queued</span>
-      </div>
-      <div class="card-body">
-        <div class="detail-problem">${esc(problem)}</div>
-        ${bodyHtml}
-        ${error ? `<div class="error-msg" style="margin-top:8px">${esc(error)}</div>` : ''}
-      </div>
-    </div>
-    ${!loading ? `
-    <div class="action-panel">
-      <div class="action-buttons">
-        <button class="btn btn-ghost" onclick="sendAction({type:'back'})">← back</button>
-        <button class="btn btn-success ${pendingAction === 'node_approve' ? 'btn-pending' : ''}" onclick="sendAction({type:'node_approve'})" ${pendingAction && pendingAction !== 'node_approve' ? 'disabled' : ''}>approve →</button>
-        ${pendingAction === 'node_approve' ? '<span class="thinking-status thinking-dots">thinking</span>' : ''}
-      </div>
-      <div class="refine-row">
-        <input type="text" id="refine-input" class="input-text" placeholder="What should change?" ${pendingAction ? 'disabled' : ''} onkeydown="handleRefineKeydown(event, 'node_refine')">
-        <button class="btn btn-secondary" onclick="sendRefine('node_refine')" ${pendingAction ? 'disabled' : ''}>refine</button>
-      </div>
-    </div>` : ''}`;
-}
-
-function renderExploreContent() {
-  const { tree } = state;
-  if (!tree) return '<div class="empty"><div>no tree</div></div>';
-  const nodeHtml = renderNodeDetail(tree, selectedId ?? tree.root_id);
-
-  return `
-    ${nodeHtml}
-    <div class="action-panel">
-      <div class="action-buttons">
-        <button class="btn btn-ghost" onclick="sendAction({type:'back'})">← back</button>
-        <button class="btn btn-primary" onclick="startBuild(false)">build</button>
-        <button class="btn btn-secondary" onclick="startBuild(true)">build with git</button>
-      </div>
-    </div>`;
-}
-
-// ── stats bar update ─────────────────────────────────────────────────────────
-function updateStats(bp) {
-  const statsEl = document.getElementById('stats');
-  if (!bp) { statsEl.style.display = 'none'; return; }
-  const allNodes = bp.epochs.flatMap(e => e.nodes);
-  const total   = allNodes.length;
-  const done    = allNodes.filter(n => n.status === 'done').length;
-  const running = allNodes.filter(n => n.status === 'running').length;
-  const errors  = allNodes.filter(n => n.status === 'error').length;
-  statsEl.style.display = 'flex';
-  statsEl.innerHTML = `
-    <span><b>${total}</b> nodes</span>
-    <span style="color:var(--green)"><b>${done}</b> done</span>
-    ${running ? `<span style="color:var(--cyan)"><b>${running}</b> running</span>` : ''}
-    ${errors  ? `<span style="color:var(--red)"><b>${errors}</b> errors</span>` : ''}
-    ${bp.outputDir ? `<span style="margin-left:auto;color:var(--dim)">→ ${esc(bp.outputDir)}</span>` : ''}
-  `;
-}
-
-// ── main render ───────────────────────────────────────────────────────────────
-function renderContent() {
-  const { screen, tree, buildProgress } = state;
-
-  // save inputs before clobbering DOM
-  const queryVal  = document.getElementById('query-input')?.value  ?? '';
-  const refineVal = document.getElementById('refine-input')?.value ?? '';
-
-  const content = document.getElementById('content');
-  const sidebar = document.getElementById('sidebar');
-  const stats   = document.getElementById('stats');
-  stats.style.display = 'none';
-
-  const showSidebar = screen === 'traversing' || screen === 'explore' || screen === 'building';
-  sidebar.style.display = showSidebar ? '' : 'none';
-
-  if (showSidebar && tree) {
-    // Only rebuild tree HTML when node count/structure changes
-    const treeKey = Object.keys(tree.nodes).sort().join(',');
-    if (treeKey !== lastTreeKey) {
-      lastTreeKey = treeKey;
-      document.getElementById('sidebar-tree').innerHTML = renderTreeNode(tree, tree.root_id, 0);
-    } else {
-      // Structure unchanged — just patch row classes in place
-      document.querySelectorAll('.tree-row[data-node-id]').forEach(el => {
-        const nid = el.dataset.nodeId;
-        const isCurrent = nid === state.traversalNodeId;
-        el.className = 'tree-row' + (isCurrent ? ' active' : nid === selectedId ? ' selected' : '');
-        const icon = el.querySelector('.node-icon');
-        if (icon) {
-          const status = nodeStatus(nid);
-          const node = tree.nodes[nid];
-          let cls = node?.is_leaf ? 'leaf' : 'internal';
-          if (status) cls = status;
-          else if (isCurrent) cls = 'running';
-          icon.className = `node-icon ${cls}`;
-        }
-      });
-    }
-
-    // Only rebuild epoch sidebar when epoch structure or node statuses change
-    const buildKey = buildProgress
-      ? buildProgress.epochs.map(e => e.nodes.map(n => n.nodeId + n.status).join('|')).join(';')
-      : '';
-    if (buildKey !== lastBuildKey) {
-      lastBuildKey = buildKey;
-      document.getElementById('sidebar-epochs').innerHTML = renderEpochSidebar(tree, buildProgress);
-    }
-  }
-
-  if (!screen || screen === 'input') {
-    content.innerHTML = renderInputScreen();
-  } else if (screen === 'root_review') {
-    content.innerHTML = renderRootReview();
-  } else if (screen === 'traversing') {
-    content.innerHTML = renderTraversalScreen();
-  } else if (screen === 'explore') {
-    content.innerHTML = renderExploreContent();
-  } else if (screen === 'building' && buildProgress) {
-    content.innerHTML = renderBuildingScreen();
-    updateStats(buildProgress);
-  } else {
-    content.innerHTML = `<div class="empty"><div class="big" style="color:var(--green)">●</div><div>connected</div></div>`;
-  }
-
-  // restore inputs
-  const qi = document.getElementById('query-input');
-  if (qi && queryVal) qi.value = queryVal;
-  const ri = document.getElementById('refine-input');
-  if (ri && refineVal) ri.value = refineVal;
-}
-
-function renderAll() {
-  const { screen, tree } = state;
-  const screenName = screen ?? 'connecting';
-
-  // header
-  document.getElementById('hdr-screen').textContent = screenName;
-  const pill = document.getElementById('hdr-pill');
-  if (tree) {
-    const nodes  = Object.values(tree.nodes);
-    const leaves = nodes.filter(n => n.is_leaf).length;
-    pill.style.display  = '';
-    pill.textContent    = `${nodes.length} nodes · ${leaves} leaves`;
-  } else {
-    pill.style.display = 'none';
-  }
-
-  renderContent();
-}
-
-// ── demo mode ─────────────────────────────────────────────────────────────────
-function activateDemo() {
-  if (demoMode) return;
-  demoMode = true;
-  document.getElementById('demo-banner').style.display = '';
-  document.getElementById('pulse').className = 'pulse';
-  document.getElementById('hdr-screen').textContent = 'demo';
-  state = DEMO_STATE;
-  selectedId = null;
-  renderAll();
-}
-
-// ── SSE connection ────────────────────────────────────────────────────────────
-let demoTimer;
 function connect() {
-  const pulse = document.getElementById('pulse');
   const es = new EventSource('/events');
-
-  es.onopen = () => {
-    everConnected = true;
-    demoMode = false;
-    document.getElementById('demo-banner').style.display = 'none';
-    pulse.className = 'pulse live';
+  es.onmessage = (e) => {
+    try {
+      state = JSON.parse(e.data);
+      if (state.focusNodeId) focusId = state.focusNodeId;
+      render();
+    } catch {}
   };
   es.onerror = () => {
-    pulse.className = 'pulse';
-    es.close();
-    if (!everConnected) {
-      demoTimer = setTimeout(activateDemo, 1500);
-      return;
-    }
-    document.getElementById('hdr-screen').textContent = 'disconnected — retrying…';
-    setTimeout(connect, 3000);
+    document.getElementById('hdr-status').textContent = 'disconnected';
+    setTimeout(connect, 2000);
   };
-  es.onmessage = (e) => {
-    clearTimeout(demoTimer);
-    demoMode = false;
-    pendingAction = null;
-    if (!everConnected) { lastTreeKey = null; lastBuildKey = null; }
-    document.getElementById('demo-banner').style.display = 'none';
-    try {
-      const next = JSON.parse(e.data);
-      if (next.traversalNodeId && next.traversalNodeId !== state.traversalNodeId) {
-        selectedId = next.traversalNodeId;
-      }
-      state = next;
-      renderAll();
-    } catch { /* ignore malformed */ }
+  es.onopen = () => {
+    document.getElementById('hdr-status').textContent = '';
   };
 }
 
-connect();
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
+
+function sendAction(action) {
+  fetch('/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(action),
+  }).catch(() => {});
+}
+
+function focusNode(id) {
+  focusId = id;
+  sendAction({ type: 'focus', nodeId: id });
+  render();
+}
+
+// ---------------------------------------------------------------------------
+// Graph traversal helpers
+// ---------------------------------------------------------------------------
+
+function getAncestorColumns(graph, nodeId, depth) {
+  const columns = [];
+  let currentIds = [nodeId];
+
+  for (let i = 0; i < depth; i++) {
+    const parentIds = new Set();
+    for (const id of currentIds) {
+      const node = graph.nodes[id];
+      if (node) {
+        for (const pid of node.parent_ids) parentIds.add(pid);
+      }
+    }
+    if (parentIds.size === 0) break;
+    const pids = [...parentIds];
+    columns.unshift(pids);
+    currentIds = pids;
+  }
+
+  return columns;
+}
+
+function getDescendantColumns(graph, nodeId, depth) {
+  const columns = [];
+  let currentIds = [nodeId];
+
+  for (let i = 0; i < depth; i++) {
+    const childIds = [];
+    for (const id of currentIds) {
+      const node = graph.nodes[id];
+      if (node) {
+        for (const cid of node.children) {
+          if (!childIds.includes(cid)) childIds.push(cid);
+        }
+      }
+    }
+    if (childIds.length === 0) break;
+    columns.push(childIds);
+    currentIds = childIds;
+  }
+
+  return columns;
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+
+function renderNodeItem(graph, id, selected) {
+  const node = graph.nodes[id];
+  if (!node) return '';
+
+  const meta = [];
+  if (node.children.length > 0) {
+    meta.push('<span class="children-count">' + node.children.length + ' children</span>');
+  }
+  if (node.links.length > 0) {
+    meta.push('<span class="link-badge">' + node.links.length + ' links</span>');
+  }
+
+  return '<div class="node-item' + (selected ? ' selected' : '') + '" onclick="focusNode(\'' + id + '\')">'
+    + '<div class="node-id">' + esc(id) + '</div>'
+    + '<div class="node-summary">' + esc(node.summary) + '</div>'
+    + (meta.length ? '<div class="node-meta">' + meta.join(' ') + '</div>' : '')
+    + '</div>';
+}
+
+function renderFocalColumn(graph, nodeId) {
+  const node = graph.nodes[nodeId];
+  if (!node) return '<div class="miller-column focal"><div class="column-header focal-header">focus</div><div class="focal-detail">Node not found</div></div>';
+
+  let linksHtml = '';
+  if (node.links.length > 0) {
+    const linkItems = node.links.map(l =>
+      '<div class="focal-link-item" onclick="focusNode(\'' + l.target + '\')">'
+      + l.relation + ' → ' + esc(l.target) + '</div>'
+    ).join('');
+    linksHtml = '<div class="focal-links"><h4>Links</h4>' + linkItems + '</div>';
+  }
+
+  let explorationHtml = '';
+  if (node.exploration.length > 0) {
+    const entries = node.exploration.map(e => {
+      const t = new Date(e.timestamp).toLocaleString();
+      const c = e.conclusion ? ' — ' + esc(e.conclusion) : '';
+      return '<div class="exploration-entry">' + esc(e.agent) + ' @ ' + t + c + '</div>';
+    }).join('');
+    explorationHtml = '<div class="focal-exploration"><h4>Exploration</h4>' + entries + '</div>';
+  }
+
+  return '<div class="miller-column focal">'
+    + '<div class="column-header focal-header">focus</div>'
+    + '<div class="focal-detail">'
+    + '<div class="focal-id">' + esc(nodeId) + '</div>'
+    + '<div class="focal-summary">' + esc(node.summary) + '</div>'
+    + '<div class="focal-content">' + esc(node.content) + '</div>'
+    + linksHtml
+    + explorationHtml
+    + '</div></div>';
+}
+
+function renderColumn(graph, nodeIds, label, faded, selectedId) {
+  const items = nodeIds.map(id => renderNodeItem(graph, id, id === selectedId)).join('');
+  return '<div class="miller-column' + (faded ? ' faded' : '') + '">'
+    + '<div class="column-header">' + esc(label) + '</div>'
+    + items
+    + '</div>';
+}
+
+function render() {
+  if (!state) return;
+
+  const graph = state.graph;
+  const empty = document.getElementById('empty-state');
+  const viewport = document.getElementById('viewport');
+  const count = document.getElementById('hdr-count');
+
+  if (!graph || !graph.nodes || Object.keys(graph.nodes).length === 0) {
+    empty.style.display = 'flex';
+    count.textContent = '';
+    // Clear any columns
+    const cols = viewport.querySelectorAll('.miller-column');
+    cols.forEach(c => c.remove());
+    return;
+  }
+
+  empty.style.display = 'none';
+  const nodeCount = Object.keys(graph.nodes).length;
+  count.textContent = nodeCount + ' nodes';
+
+  // Default focus to first root
+  if (!focusId || !graph.nodes[focusId]) {
+    focusId = graph.root_ids[0] || Object.keys(graph.nodes)[0];
+  }
+
+  const DEPTH = 2;
+  const ancestorCols = getAncestorColumns(graph, focusId, DEPTH);
+  const descendantCols = getDescendantColumns(graph, focusId, DEPTH);
+
+  let html = '';
+
+  // Ancestor columns (left of focus)
+  for (let i = 0; i < ancestorCols.length; i++) {
+    const faded = i < ancestorCols.length - 1;
+    const label = i === 0 && ancestorCols.length > 1 ? 'ancestors' : 'parent' + (ancestorCols[i].length > 1 ? 's' : '');
+    // Determine which node in this column leads to the focus
+    const nextCol = i < ancestorCols.length - 1 ? ancestorCols[i + 1] : [focusId];
+    const selectedInCol = ancestorCols[i].find(id => {
+      const node = graph.nodes[id];
+      return node && node.children.some(c => nextCol.includes(c));
+    });
+    html += renderColumn(graph, ancestorCols[i], label, faded, selectedInCol);
+  }
+
+  // Focal column (center)
+  html += renderFocalColumn(graph, focusId);
+
+  // Descendant columns (right of focus)
+  for (let i = 0; i < descendantCols.length; i++) {
+    const faded = i > 0;
+    const label = i === 0 ? 'children' : 'descendants';
+    html += renderColumn(graph, descendantCols[i], label, faded, null);
+  }
+
+  // Replace content (keep empty-state element)
+  const cols = viewport.querySelectorAll('.miller-column');
+  cols.forEach(c => c.remove());
+  viewport.insertAdjacentHTML('beforeend', html);
+
+  // Scroll to center the focal column
+  const focalEl = viewport.querySelector('.miller-column.focal');
+  if (focalEl) {
+    const scrollLeft = focalEl.offsetLeft - (viewport.clientWidth - focalEl.clientWidth) / 2;
+    viewport.scrollLeft = Math.max(0, scrollLeft);
+  }
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Demo state for static deployment
+// ---------------------------------------------------------------------------
+
+const DEMO = {
+  screen: 'browse',
+  loading: false,
+  graph: {
+    root_ids: ['project'],
+    nodes: {
+      'project': {
+        id: 'project', content: 'A graph-structured memory system for LLM agent teams.',
+        summary: 'Zygomorphic: graph memory for agents',
+        parent_ids: [], children: ['core', 'ui', 'mcp'], links: [], depth: 0, exploration: []
+      },
+      'core': {
+        id: 'core', content: 'Core data model, state machine, persistence, and summary propagation.',
+        summary: 'Core engine: data model, state, persistence',
+        parent_ids: ['project'], children: ['types', 'state'], links: [{ target: 'mcp', relation: 'consumed_by' }], depth: 1, exploration: []
+      },
+      'ui': {
+        id: 'ui', content: 'Electron app with bidirectional Miller column navigator.',
+        summary: 'Visual interface: Miller columns in Electron',
+        parent_ids: ['project'], children: [], links: [], depth: 1, exploration: []
+      },
+      'mcp': {
+        id: 'mcp', content: 'MCP server exposing 10 graph tools over stdio.',
+        summary: 'Agent interface: MCP server with 10 tools',
+        parent_ids: ['project'], children: [], links: [{ target: 'core', relation: 'depends_on' }], depth: 1,
+        exploration: [{ agent: 'explorer-1', timestamp: Date.now() - 60000, conclusion: 'Implementation complete' }]
+      },
+      'types': {
+        id: 'types', content: 'NodeData, GraphData, Link, ExplorationEntry — the generic graph schema.',
+        summary: 'Type definitions: nodes, graphs, links',
+        parent_ids: ['core'], children: [], links: [], depth: 2, exploration: []
+      },
+      'state': {
+        id: 'state', content: 'Pure reducer with events for all graph mutations.',
+        summary: 'State machine: pure reducer, 11 event types',
+        parent_ids: ['core'], children: [], links: [], depth: 2, exploration: []
+      }
+    }
+  },
+  focusNodeId: 'project'
+};
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+
+(function init() {
+  // Try SSE connection; if it fails, fall back to demo
+  const es = new EventSource('/events');
+  let connected = false;
+
+  es.onmessage = (e) => {
+    connected = true;
+    try {
+      state = JSON.parse(e.data);
+      if (state.focusNodeId) focusId = state.focusNodeId;
+      render();
+    } catch {}
+  };
+
+  es.onerror = () => {
+    if (!connected) {
+      // No server — use demo state
+      es.close();
+      state = DEMO;
+      focusId = DEMO.focusNodeId;
+      document.getElementById('hdr-status').textContent = 'demo';
+      render();
+    } else {
+      document.getElementById('hdr-status').textContent = 'disconnected';
+    }
+  };
+
+  es.onopen = () => {
+    connected = true;
+    document.getElementById('hdr-status').textContent = '';
+  };
+})();
 </script>
 </body>
 </html>

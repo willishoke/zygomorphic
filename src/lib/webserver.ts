@@ -67,8 +67,9 @@ export function createWebServer(port = 7777, orch?: Orchestrator): http.Server {
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
-        // Action dispatch will be re-wired for graph operations
-        console.log('action received:', action.type);
+        if (orch && action.type === 'focus' && typeof action.nodeId === 'string') {
+          orch.dispatch({ type: 'FOCUS_CHANGED', nodeId: action.nodeId });
+        }
       });
       return;
     }
