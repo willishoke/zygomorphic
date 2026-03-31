@@ -286,6 +286,29 @@ export function createMcpServer(): McpServer {
     },
   );
 
+  // ---- record_exploration ---------------------------------------------------
+  server.tool(
+    'record_exploration',
+    'Record that an agent visited a node, with an optional conclusion',
+    {
+      id: z.string().describe('Node ID that was explored'),
+      agent: z.string().describe('Agent identifier'),
+      conclusion: z.string().optional().describe('What was found or concluded'),
+    },
+    async ({ id, agent, conclusion }) => {
+      if (!graph().nodes[id]) {
+        return { content: [{ type: 'text', text: `Node '${id}' not found` }], isError: true };
+      }
+
+      dispatch({
+        type: 'EXPLORATION_UPDATED',
+        nodeId: id,
+        entry: { agent, timestamp: Date.now(), conclusion },
+      });
+      return { content: [{ type: 'text', text: `Recorded exploration of ${id} by ${agent}` }] };
+    },
+  );
+
   // ---- get_exploration_state -----------------------------------------------
   server.tool(
     'get_exploration_state',
