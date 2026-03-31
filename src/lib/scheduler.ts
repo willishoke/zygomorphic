@@ -1,6 +1,6 @@
 /**
  * Topological sort of leaf nodes into parallel epochs.
- * Port of anamorphic/scheduler.py.
+ * Topological epoch scheduler.
  */
 import type { NodeData } from './types.js';
 

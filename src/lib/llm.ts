@@ -12,7 +12,7 @@ import type { RootAnalysis, LeafSchema } from './types.js';
 
 const execFileP = promisify(execFile);
 
-const MODEL = process.env['ANAMORPHIC_MODEL'] ?? 'claude-sonnet-4-6';
+const MODEL = process.env['ZYGOMORPHIC_MODEL'] ?? 'claude-sonnet-4-6';
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 2000;
 const MAX_BUF = 16 * 1024 * 1024; // 16 MB
