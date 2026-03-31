@@ -1,321 +1,209 @@
 import { describe, it, expect } from 'vitest';
 import { initialState, reduce, AppState, AppEvent } from './state.js';
-import type { NodeData, RootAnalysis, TreeData, LeafSchema } from './types.js';
+import type { NodeData, GraphData } from './types.js';
 
 // ---- Helpers ---------------------------------------------------------------
 
-function leaf(id: string, problem = id): NodeData {
-  return { id, problem, parent_id: null, children: [], is_leaf: false, depth: 0, plan: null, dependencies: [], schema: null };
+function makeNode(id: string, opts: Partial<NodeData> = {}): NodeData {
+  return {
+    id,
+    content: opts.content ?? id,
+    summary: opts.summary ?? `summary of ${id}`,
+    parent_ids: opts.parent_ids ?? [],
+    children: opts.children ?? [],
+    links: opts.links ?? [],
+    depth: opts.depth ?? 0,
+    exploration: opts.exploration ?? [],
+  };
 }
 
-function rootReviewState(): AppState {
-  const analysis: RootAnalysis = { problem_statement: 'build a thing' };
-  const rootNode = leaf('0', 'build a thing');
-  const s0 = reduce(initialState(), { type: 'QUERY_SUBMITTED', rootNode });
-  return reduce(s0, { type: 'ROOT_ANALYZED', problem: 'build a thing', analysis });
+function makeGraph(nodes: NodeData[], root_ids?: string[]): GraphData {
+  const nodeMap: Record<string, NodeData> = {};
+  for (const n of nodes) nodeMap[n.id] = n;
+  return {
+    root_ids: root_ids ?? nodes.filter((n) => n.parent_ids.length === 0).map((n) => n.id),
+    nodes: nodeMap,
+  };
 }
 
-function traversingState(): AppState {
-  const s0 = rootReviewState();
-  const tree = s0.tree!;
-  const s1 = reduce(s0, { type: 'ROOT_APPROVED', rootId: '0', tree });
-  return reduce(s1, { type: 'TRAVERSAL_NODE_LOADING', nodeId: '0' });
+function loadedState(graph?: GraphData): AppState {
+  const g = graph ?? makeGraph([makeNode('root')]);
+  return reduce(initialState(), { type: 'GRAPH_LOADED', graph: g });
 }
 
-// ---- QUERY_SUBMITTED -------------------------------------------------------
+// ---- GRAPH_LOADED ----------------------------------------------------------
 
-describe('QUERY_SUBMITTED', () => {
-  it('sets loading and seeds the tree', () => {
-    const rootNode = leaf('0', 'my query');
-    const s = reduce(initialState(), { type: 'QUERY_SUBMITTED', rootNode });
-    expect(s.loading).toBe(true);
-    expect(s.screen.tag).toBe('input');
-    expect(s.tree?.nodes['0']?.problem).toBe('my query');
+describe('GRAPH_LOADED', () => {
+  it('sets graph and transitions to browse', () => {
+    const graph = makeGraph([makeNode('r')]);
+    const s = reduce(initialState(), { type: 'GRAPH_LOADED', graph });
+    expect(s.screen.tag).toBe('browse');
+    expect(s.graph).toBe(graph);
+    expect(s.focusNodeId).toBe('r');
   });
 
-  it('resets prior state', () => {
-    const s0 = rootReviewState();
-    const rootNode = leaf('0', 'new query');
-    const s1 = reduce(s0, { type: 'QUERY_SUBMITTED', rootNode });
-    expect(s1.rootRef).toBeNull();
-    expect(s1.error).toBeUndefined();
-    expect(s1.buildProgress).toBeNull();
+  it('focuses first root when multiple roots exist', () => {
+    const graph = makeGraph([makeNode('a'), makeNode('b')], ['a', 'b']);
+    const s = reduce(initialState(), { type: 'GRAPH_LOADED', graph });
+    expect(s.focusNodeId).toBe('a');
   });
 });
 
-// ---- ROOT_ANALYZED ---------------------------------------------------------
+// ---- NODE_CREATED ----------------------------------------------------------
 
-describe('ROOT_ANALYZED', () => {
-  it('transitions to root_review and clears loading', () => {
-    const rootNode = leaf('0', 'q');
-    const s0 = reduce(initialState(), { type: 'QUERY_SUBMITTED', rootNode });
-    const analysis: RootAnalysis = { problem_statement: 'q refined' };
-    const s1 = reduce(s0, { type: 'ROOT_ANALYZED', problem: 'q', analysis });
-
-    expect(s1.screen.tag).toBe('root_review');
-    expect(s1.loading).toBe(false);
-    expect(s1.rootRef).toEqual({ problem: 'q', analysis });
-    if (s1.screen.tag === 'root_review') {
-      expect(s1.screen.analysis).toBe(analysis);
-    }
+describe('NODE_CREATED', () => {
+  it('adds a root node when no parents', () => {
+    const s0 = loadedState();
+    const node = makeNode('new');
+    const s1 = reduce(s0, { type: 'NODE_CREATED', node });
+    expect(s1.graph!.nodes['new']).toBe(node);
+    expect(s1.graph!.root_ids).toContain('new');
   });
 
-  it('clears a prior error', () => {
-    const s0: AppState = { ...initialState(), error: 'something went wrong' };
-    const s1 = reduce(s0, { type: 'ROOT_ANALYZED', problem: 'q', analysis: {} });
-    expect(s1.error).toBeUndefined();
-  });
-});
-
-// ---- ROOT_APPROVED / traversal init ----------------------------------------
-
-describe('ROOT_APPROVED', () => {
-  it('seeds the traversal queue with the root id', () => {
-    const s0 = rootReviewState();
-    const s1 = reduce(s0, { type: 'ROOT_APPROVED', rootId: '0', tree: s0.tree! });
-    expect(s1.traversalQueue).toEqual(['0']);
-    expect(s1.traversalSeen).toBe(0);
+  it('adds a child node and updates parent', () => {
+    const s0 = loadedState();
+    const child = makeNode('child', { parent_ids: ['root'] });
+    const s1 = reduce(s0, { type: 'NODE_CREATED', node: child });
+    expect(s1.graph!.nodes['child']).toBe(child);
+    expect(s1.graph!.nodes['root']!.children).toContain('child');
+    expect(s1.graph!.root_ids).not.toContain('child');
   });
 
-  it('restores a null tree from the event', () => {
-    const s0: AppState = { ...rootReviewState(), tree: null };
-    const freshTree: TreeData = { root_id: '0', nodes: { '0': leaf('0', 'q') } };
-    const s1 = reduce(s0, { type: 'ROOT_APPROVED', rootId: '0', tree: freshTree });
-    expect(s1.tree).toBe(freshTree);
-  });
-});
-
-// ---- TRAVERSAL_NODE_LOADING ------------------------------------------------
-
-describe('TRAVERSAL_NODE_LOADING', () => {
-  it('shifts the queue, increments seen, sets loading', () => {
-    const s0 = rootReviewState();
-    const tree = s0.tree!;
-    const s1 = reduce(s0, { type: 'ROOT_APPROVED', rootId: '0', tree });
-    expect(s1.traversalQueue).toEqual(['0']);
-
-    const s2 = reduce(s1, { type: 'TRAVERSAL_NODE_LOADING', nodeId: '0' });
-    expect(s2.traversalQueue).toEqual([]);
-    expect(s2.traversalSeen).toBe(1);
-    expect(s2.loading).toBe(true);
-    expect(s2.screen.tag).toBe('traversing');
-    if (s2.screen.tag === 'traversing') {
-      expect(s2.screen.currentId).toBe('0');
-    }
-  });
-});
-
-// ---- NODE_ASSESSED_LEAF / NODE_ASSESSED_BRANCH ----------------------------
-
-describe('NODE_ASSESSED_LEAF', () => {
-  it('sets traversal with leaf info and clears loading', () => {
-    const s0 = traversingState();
-    const schema: LeafSchema = { summary: 'do the thing', steps: ['step 1'] };
-    const s1 = reduce(s0, {
-      type: 'NODE_ASSESSED_LEAF',
-      nodeId: '0', problem: 'build a thing', schema,
-      queueLength: 0, totalSeen: 1,
-    });
-    expect(s1.loading).toBe(false);
-    expect(s1.traversal?.isLeaf).toBe(true);
-    expect(s1.traversal?.pendingSchema).toBe(schema);
-    expect(s1.traversal?.nodeId).toBe('0');
-  });
-});
-
-describe('NODE_ASSESSED_BRANCH', () => {
-  it('sets traversal with branch info and clears loading', () => {
-    const s0 = traversingState();
-    const s1 = reduce(s0, {
-      type: 'NODE_ASSESSED_BRANCH',
-      nodeId: '0', problem: 'build a thing',
-      subproblems: ['part A', 'part B'],
-      queueLength: 0, totalSeen: 1,
-    });
-    expect(s1.loading).toBe(false);
-    expect(s1.traversal?.isLeaf).toBe(false);
-    expect(s1.traversal?.pendingSubproblems).toEqual(['part A', 'part B']);
-  });
-});
-
-// ---- NODE_REFINED ----------------------------------------------------------
-
-describe('NODE_REFINED', () => {
-  it('updates pendingSchema for a leaf traversal', () => {
-    const s0 = traversingState();
-    const schema: LeafSchema = { summary: 'original' };
-    const s1 = reduce(s0, {
-      type: 'NODE_ASSESSED_LEAF', nodeId: '0', problem: 'p', schema,
-      queueLength: 0, totalSeen: 1,
-    });
-    const refined: LeafSchema = { summary: 'refined' };
-    const s2 = reduce(reduce(s1, { type: 'REFINE_NODE_STARTED' }), { type: 'NODE_REFINED', schema: refined });
-    expect(s2.traversal?.pendingSchema).toBe(refined);
-    expect(s2.loading).toBe(false);
-  });
-
-  it('updates pendingSubproblems for a branch traversal', () => {
-    const s0 = traversingState();
-    const s1 = reduce(s0, {
-      type: 'NODE_ASSESSED_BRANCH', nodeId: '0', problem: 'p',
-      subproblems: ['A', 'B'], queueLength: 0, totalSeen: 1,
-    });
-    const s2 = reduce(reduce(s1, { type: 'REFINE_NODE_STARTED' }), {
-      type: 'NODE_REFINED', subproblems: ['A refined', 'B refined', 'C new'],
-    });
-    expect(s2.traversal?.pendingSubproblems).toEqual(['A refined', 'B refined', 'C new']);
-  });
-
-  it('is a no-op if there is no active traversal', () => {
-    const s0 = rootReviewState();
-    const s1 = reduce(s0, { type: 'NODE_REFINED', schema: { summary: 'x' } });
+  it('is a no-op without a graph', () => {
+    const s0 = initialState();
+    const s1 = reduce(s0, { type: 'NODE_CREATED', node: makeNode('x') });
     expect(s1).toBe(s0);
   });
 });
 
-// ---- NODE_LEAF_COMMITTED ---------------------------------------------------
+// ---- NODE_UPDATED ----------------------------------------------------------
 
-describe('NODE_LEAF_COMMITTED', () => {
-  it('clears traversal and updates the tree', () => {
-    const s0 = traversingState();
-    const updatedTree: TreeData = {
-      root_id: '0',
-      nodes: { '0': { ...leaf('0', 'build a thing'), is_leaf: true } },
-    };
-    const s1 = reduce(s0, { type: 'NODE_LEAF_COMMITTED', updatedTree });
-    expect(s1.traversal).toBeNull();
-    expect(s1.tree).toBe(updatedTree);
+describe('NODE_UPDATED', () => {
+  it('updates content and summary', () => {
+    const s0 = loadedState();
+    const s1 = reduce(s0, { type: 'NODE_UPDATED', nodeId: 'root', content: 'new content', summary: 'new summary' });
+    expect(s1.graph!.nodes['root']!.content).toBe('new content');
+    expect(s1.graph!.nodes['root']!.summary).toBe('new summary');
+  });
+
+  it('is a no-op for unknown node', () => {
+    const s0 = loadedState();
+    const s1 = reduce(s0, { type: 'NODE_UPDATED', nodeId: 'ghost', content: 'x', summary: 'x' });
+    expect(s1).toBe(s0);
   });
 });
 
-// ---- NODE_CHILDREN_ADDED ---------------------------------------------------
+// ---- NODE_DELETED ----------------------------------------------------------
 
-describe('NODE_CHILDREN_ADDED', () => {
-  it('clears traversal, updates tree and queue', () => {
-    const s0 = traversingState();
-    const childA = leaf('1', 'part A');
-    const childB = leaf('2', 'part B');
-    const updatedTree: TreeData = {
-      root_id: '0',
-      nodes: { '0': { ...leaf('0'), children: ['1', '2'] }, '1': childA, '2': childB },
-    };
-    const s1 = reduce(s0, { type: 'NODE_CHILDREN_ADDED', updatedTree, updatedQueue: ['1', '2'] });
-    expect(s1.traversal).toBeNull();
-    expect(s1.tree).toBe(updatedTree);
-    expect(s1.traversalQueue).toEqual(['1', '2']);
+describe('NODE_DELETED', () => {
+  it('removes node and cleans up parent references', () => {
+    const parent = makeNode('p', { children: ['c'] });
+    const child = makeNode('c', { parent_ids: ['p'] });
+    const graph = makeGraph([parent, child], ['p']);
+    const s0 = loadedState(graph);
+    const s1 = reduce(s0, { type: 'NODE_DELETED', nodeId: 'c' });
+    expect(s1.graph!.nodes['c']).toBeUndefined();
+    expect(s1.graph!.nodes['p']!.children).toEqual([]);
+  });
+
+  it('removes from root_ids if root', () => {
+    const graph = makeGraph([makeNode('a'), makeNode('b')], ['a', 'b']);
+    const s0 = loadedState(graph);
+    const s1 = reduce(s0, { type: 'NODE_DELETED', nodeId: 'a' });
+    expect(s1.graph!.root_ids).toEqual(['b']);
+  });
+
+  it('clears focus if deleted node was focused', () => {
+    const s0 = loadedState();
+    expect(s0.focusNodeId).toBe('root');
+    const s1 = reduce(s0, { type: 'NODE_DELETED', nodeId: 'root' });
+    expect(s1.focusNodeId).toBeNull();
   });
 });
 
-// ---- TRAVERSAL_COMPLETE ----------------------------------------------------
+// ---- LINK_CREATED / LINK_DELETED -------------------------------------------
 
-describe('TRAVERSAL_COMPLETE', () => {
-  it('transitions to explore and clears traversal state', () => {
-    const s0 = traversingState();
-    const s1 = reduce(s0, { type: 'TRAVERSAL_COMPLETE' });
-    expect(s1.screen.tag).toBe('explore');
-    expect(s1.traversal).toBeNull();
-    expect(s1.traversalQueue).toEqual([]);
+describe('LINK_CREATED', () => {
+  it('adds a link to the source node', () => {
+    const graph = makeGraph([makeNode('a'), makeNode('b')], ['a', 'b']);
+    const s0 = loadedState(graph);
+    const s1 = reduce(s0, { type: 'LINK_CREATED', fromId: 'a', link: { target: 'b', relation: 'see_also' } });
+    expect(s1.graph!.nodes['a']!.links).toEqual([{ target: 'b', relation: 'see_also' }]);
   });
 });
 
-// ---- BUILD events ----------------------------------------------------------
-
-describe('BUILD_STARTED', () => {
-  it('sets screen to building and initializes buildProgress', () => {
-    const s0: AppState = { ...initialState(), screen: { tag: 'explore', tree: { root_id: '0', nodes: {} } } };
-    const epochs = [{ nodes: [{ nodeId: '1', problem: 'p', status: 'waiting' as const }] }];
-    const s1 = reduce(s0, { type: 'BUILD_STARTED', initialEpochs: epochs, git: false, outputDir: 'output' });
-    expect(s1.screen.tag).toBe('building');
-    expect(s1.buildProgress?.activeEpoch).toBe(-1);
-    expect(s1.buildProgress?.done).toBe(false);
-    expect(s1.buildProgress?.epochs).toBe(epochs);
+describe('LINK_DELETED', () => {
+  it('removes the matching link', () => {
+    const a = makeNode('a', { links: [{ target: 'b', relation: 'see_also' }, { target: 'c', relation: 'depends_on' }] });
+    const graph = makeGraph([a, makeNode('b'), makeNode('c')], ['a', 'b', 'c']);
+    const s0 = loadedState(graph);
+    const s1 = reduce(s0, { type: 'LINK_DELETED', fromId: 'a', targetId: 'b', relation: 'see_also' });
+    expect(s1.graph!.nodes['a']!.links).toEqual([{ target: 'c', relation: 'depends_on' }]);
   });
 });
 
-describe('BUILD_NODE_DONE', () => {
-  it('patches only the targeted node', () => {
-    const epochs = [{
-      nodes: [
-        { nodeId: 'a', problem: 'A', status: 'running' as const },
-        { nodeId: 'b', problem: 'B', status: 'waiting' as const },
-      ],
-    }];
-    const s0: AppState = {
-      ...initialState(),
-      screen: { tag: 'building' },
-      buildProgress: { epochs, activeEpoch: 0, done: false },
-    };
-    const s1 = reduce(s0, {
-      type: 'BUILD_NODE_DONE', nodeId: 'a', status: 'done', outputPath: 'output/a',
-    });
-    const nodes = s1.buildProgress!.epochs[0]!.nodes;
-    expect(nodes[0]!.status).toBe('done');
-    expect(nodes[0]!.outputPath).toBe('output/a');
-    expect(nodes[1]!.status).toBe('waiting'); // untouched
+// ---- NODE_RESTRUCTURED -----------------------------------------------------
+
+describe('NODE_RESTRUCTURED', () => {
+  it('moves node from old parent to new parent', () => {
+    const p1 = makeNode('p1', { children: ['child'] });
+    const p2 = makeNode('p2');
+    const child = makeNode('child', { parent_ids: ['p1'] });
+    const graph = makeGraph([p1, p2, child], ['p1', 'p2']);
+    const s0 = loadedState(graph);
+    const s1 = reduce(s0, { type: 'NODE_RESTRUCTURED', nodeId: 'child', oldParentId: 'p1', newParentId: 'p2' });
+
+    expect(s1.graph!.nodes['child']!.parent_ids).toEqual(['p2']);
+    expect(s1.graph!.nodes['p1']!.children).toEqual([]);
+    expect(s1.graph!.nodes['p2']!.children).toEqual(['child']);
+  });
+
+  it('is a no-op when nodes do not exist', () => {
+    const s0 = loadedState();
+    const s1 = reduce(s0, { type: 'NODE_RESTRUCTURED', nodeId: 'ghost', oldParentId: 'root', newParentId: 'root' });
+    expect(s1).toBe(s0);
   });
 });
 
-describe('BUILD_COMPLETE', () => {
-  it('marks done and preserves fatalError', () => {
-    const s0: AppState = {
-      ...initialState(),
-      screen: { tag: 'building' },
-      buildProgress: { epochs: [], activeEpoch: 0, done: false },
-    };
-    const s1 = reduce(s0, { type: 'BUILD_COMPLETE', fatalError: 'oops' });
-    expect(s1.buildProgress?.done).toBe(true);
-    expect(s1.buildProgress?.fatalError).toBe('oops');
+// ---- SUMMARY_UPDATED -------------------------------------------------------
+
+describe('SUMMARY_UPDATED', () => {
+  it('updates the summary on the target node', () => {
+    const s0 = loadedState();
+    const s1 = reduce(s0, { type: 'SUMMARY_UPDATED', nodeId: 'root', summary: 'updated summary' });
+    expect(s1.graph!.nodes['root']!.summary).toBe('updated summary');
   });
 });
 
-// ---- BACK ------------------------------------------------------------------
+// ---- EXPLORATION_UPDATED ---------------------------------------------------
 
-describe('BACK', () => {
-  it('root_review → input: full reset', () => {
-    const s0 = rootReviewState();
-    const s1 = reduce(s0, { type: 'BACK' });
-    expect(s1.screen.tag).toBe('input');
-    expect(s1.rootRef).toBeNull();
-    expect(s1.tree).toBeNull();
+describe('EXPLORATION_UPDATED', () => {
+  it('appends an exploration entry', () => {
+    const s0 = loadedState();
+    const entry = { agent: 'agent-1', timestamp: 1000, conclusion: 'relevant' };
+    const s1 = reduce(s0, { type: 'EXPLORATION_UPDATED', nodeId: 'root', entry });
+    expect(s1.graph!.nodes['root']!.exploration).toEqual([entry]);
+
+    const entry2 = { agent: 'agent-2', timestamp: 2000 };
+    const s2 = reduce(s1, { type: 'EXPLORATION_UPDATED', nodeId: 'root', entry: entry2 });
+    expect(s2.graph!.nodes['root']!.exploration).toEqual([entry, entry2]);
+  });
+});
+
+// ---- FOCUS_CHANGED ---------------------------------------------------------
+
+describe('FOCUS_CHANGED', () => {
+  it('updates focusNodeId', () => {
+    const graph = makeGraph([makeNode('a'), makeNode('b')], ['a', 'b']);
+    const s0 = loadedState(graph);
+    const s1 = reduce(s0, { type: 'FOCUS_CHANGED', nodeId: 'b' });
+    expect(s1.focusNodeId).toBe('b');
   });
 
-  it('traversing → root_review: resets tree and queue', () => {
-    const s0 = traversingState();
-    const s1 = reduce(s0, { type: 'BACK' });
-    expect(s1.screen.tag).toBe('root_review');
-    expect(s1.tree).toBeNull();
-    expect(s1.traversalQueue).toEqual([]);
-    expect(s1.traversal).toBeNull();
-  });
-
-  it('explore → root_review: keeps tree', () => {
-    const tree: TreeData = { root_id: '0', nodes: { '0': leaf('0') } };
-    const s0: AppState = {
-      ...rootReviewState(),
-      screen: { tag: 'explore', tree },
-      tree,
-    };
-    const s1 = reduce(s0, { type: 'BACK' });
-    expect(s1.screen.tag).toBe('root_review');
-    expect(s1.tree).toBe(tree); // preserved
-  });
-
-  it('building → explore', () => {
-    const tree: TreeData = { root_id: '0', nodes: { '0': leaf('0') } };
-    const s0: AppState = {
-      ...initialState(),
-      screen: { tag: 'building' },
-      tree,
-      buildProgress: { epochs: [], activeEpoch: 0, done: false },
-    };
-    const s1 = reduce(s0, { type: 'BACK' });
-    expect(s1.screen.tag).toBe('explore');
-  });
-
-  it('is a no-op from input', () => {
-    const s0 = initialState();
-    const s1 = reduce(s0, { type: 'BACK' });
-    expect(s1).toEqual(s0);
+  it('can clear focus to null', () => {
+    const s0 = loadedState();
+    const s1 = reduce(s0, { type: 'FOCUS_CHANGED', nodeId: null });
+    expect(s1.focusNodeId).toBeNull();
   });
 });
 
@@ -323,17 +211,15 @@ describe('BACK', () => {
 
 describe('ERROR', () => {
   it('clears loading and sets the message', () => {
-    const rootNode = leaf('0', 'q');
-    const s0 = reduce(initialState(), { type: 'QUERY_SUBMITTED', rootNode });
-    expect(s0.loading).toBe(true);
-    const s1 = reduce(s0, { type: 'ERROR', message: 'api down' });
+    const s0: AppState = { ...loadedState(), loading: true };
+    const s1 = reduce(s0, { type: 'ERROR', message: 'something broke' });
     expect(s1.loading).toBe(false);
-    expect(s1.error).toBe('api down');
+    expect(s1.error).toBe('something broke');
   });
 
   it('preserves the current screen', () => {
-    const s0 = rootReviewState();
+    const s0 = loadedState();
     const s1 = reduce(s0, { type: 'ERROR', message: 'nope' });
-    expect(s1.screen.tag).toBe('root_review');
+    expect(s1.screen.tag).toBe('browse');
   });
 });

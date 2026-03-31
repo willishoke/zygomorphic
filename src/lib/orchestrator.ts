@@ -22,15 +22,14 @@ export class Orchestrator extends EventEmitter {
   }
 
   getState(): WebState {
-    const { screen, loading, error, tree } = this.state;
+    const { screen, loading, error, graph, focusNodeId } = this.state;
 
     return {
       screen: screen.tag,
       loading,
       error,
-      tree,
-      traversalNodeId: null,
-      buildProgress: null,
+      graph,
+      focusNodeId,
     };
   }
 }

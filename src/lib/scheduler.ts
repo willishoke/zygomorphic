@@ -1,13 +1,22 @@
 /**
  * Topological sort of leaf nodes into parallel epochs.
- * Topological epoch scheduler.
  */
 import type { NodeData } from './types.js';
+
+function isLeaf(node: NodeData): boolean {
+  return node.children.length === 0;
+}
+
+function getDependencies(node: NodeData): string[] {
+  return node.links
+    .filter((l) => l.relation === 'depends_on')
+    .map((l) => l.target);
+}
 
 export function leafDescendants(nodes: Record<string, NodeData>, nodeId: string): Set<string> {
   const node = nodes[nodeId];
   if (!node) return new Set();
-  if (node.is_leaf) return new Set([nodeId]);
+  if (isLeaf(node)) return new Set([nodeId]);
   const result = new Set<string>();
   for (const childId of node.children) {
     for (const id of leafDescendants(nodes, childId)) result.add(id);
@@ -16,12 +25,12 @@ export function leafDescendants(nodes: Record<string, NodeData>, nodeId: string)
 }
 
 export function buildDepGraph(nodes: Record<string, NodeData>): Map<string, Set<string>> {
-  const allLeaves = new Set(Object.keys(nodes).filter((id) => nodes[id]!.is_leaf));
+  const allLeaves = new Set(Object.keys(nodes).filter((id) => isLeaf(nodes[id]!)));
   const graph = new Map<string, Set<string>>();
 
   for (const lid of allLeaves) {
     graph.set(lid, new Set());
-    for (const depId of nodes[lid]!.dependencies) {
+    for (const depId of getDependencies(nodes[lid]!)) {
       if (!nodes[depId]) continue;
       for (const dl of leafDescendants(nodes, depId)) {
         if (dl !== lid) graph.get(lid)!.add(dl);
