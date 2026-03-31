@@ -5,8 +5,7 @@
  */
 
 import {
-  AppScreen, TreeData, TraversalInfo, BuildProgress,
-  RootAnalysis, LeafSchema, NodeData, EpochInfo, NodeBuildStatus,
+  AppScreen, GraphData, NodeData, Link, ExplorationEntry,
 } from './types.js';
 
 // ---- State ----------------------------------------------------------------
@@ -15,59 +14,41 @@ export interface AppState {
   screen: AppScreen;
   loading: boolean;
   error: string | undefined;
-  rootRef: { problem: string; analysis: RootAnalysis } | null;
-  tree: TreeData | null;
-  traversalQueue: string[];
-  traversalSeen: number;
-  traversal: TraversalInfo | null;
-  buildProgress: BuildProgress | null;
+  graph: GraphData | null;
+  focusNodeId: string | null;
 }
 
 export function initialState(): AppState {
   return {
-    screen: { tag: 'input' },
+    screen: { tag: 'empty' },
     loading: false,
     error: undefined,
-    rootRef: null,
-    tree: null,
-    traversalQueue: [],
-    traversalSeen: 0,
-    traversal: null,
-    buildProgress: null,
+    graph: null,
+    focusNodeId: null,
   };
 }
 
 // ---- Events ---------------------------------------------------------------
-// Async operations fire two events: one on initiation (sets loading) and one
-// on completion (clears loading, updates state). This keeps the reducer as
-// the single place where state shape changes are defined.
 
 export type AppEvent =
-  // Initiations
-  | { type: 'QUERY_SUBMITTED'; rootNode: NodeData }
-  | { type: 'REFINE_ROOT_STARTED' }
-  | { type: 'ROOT_APPROVED'; rootId: string; tree: TreeData }
-  | { type: 'TRAVERSAL_NODE_LOADING'; nodeId: string }
-  | { type: 'REFINE_NODE_STARTED' }
-  // Async completions
-  | { type: 'ROOT_ANALYZED'; problem: string; analysis: RootAnalysis }
-  | { type: 'NODE_ASSESSED_LEAF'; nodeId: string; problem: string; schema: LeafSchema; queueLength: number; totalSeen: number }
-  | { type: 'NODE_ASSESSED_BRANCH'; nodeId: string; problem: string; subproblems: string[]; queueLength: number; totalSeen: number }
-  | { type: 'NODE_REFINED'; schema?: LeafSchema; subproblems?: string[] }
-  | { type: 'NODE_LEAF_COMMITTED'; updatedTree: TreeData }
-  | { type: 'NODE_CHILDREN_ADDED'; updatedTree: TreeData; updatedQueue: string[] }
-  | { type: 'TRAVERSAL_COMPLETE' }
-  // Build progress
-  | { type: 'BUILD_STARTED'; initialEpochs: EpochInfo[]; git: boolean; outputDir: string }
-  | { type: 'BUILD_EPOCH_STARTED'; epochIdx: number }
-  | { type: 'BUILD_NODE_STARTED'; nodeId: string }
-  | { type: 'BUILD_NODE_GIT_STEP'; nodeId: string; step: string }
-  | { type: 'BUILD_NODE_COMMIT'; nodeId: string; commitCount: number }
-  | { type: 'BUILD_NODE_DONE'; nodeId: string; status: 'done' | 'error'; outputPath?: string; error?: string; branchName?: string; commitCount?: number }
-  | { type: 'BUILD_GIT_ERROR'; error: string }
-  | { type: 'BUILD_COMPLETE'; fatalError?: string }
-  // Navigation & cross-cutting
-  | { type: 'BACK' }
+  // Graph lifecycle
+  | { type: 'GRAPH_LOADED'; graph: GraphData }
+  // Node CRUD
+  | { type: 'NODE_CREATED'; node: NodeData }
+  | { type: 'NODE_UPDATED'; nodeId: string; content: string; summary: string }
+  | { type: 'NODE_DELETED'; nodeId: string }
+  // Links
+  | { type: 'LINK_CREATED'; fromId: string; link: Link }
+  | { type: 'LINK_DELETED'; fromId: string; targetId: string; relation: string }
+  // Structure
+  | { type: 'NODE_RESTRUCTURED'; nodeId: string; oldParentId: string; newParentId: string }
+  // Summary propagation
+  | { type: 'SUMMARY_UPDATED'; nodeId: string; summary: string }
+  // Exploration
+  | { type: 'EXPLORATION_UPDATED'; nodeId: string; entry: ExplorationEntry }
+  // Navigation
+  | { type: 'FOCUS_CHANGED'; nodeId: string | null }
+  // Cross-cutting
   | { type: 'ERROR'; message: string };
 
 // ---- Reducer --------------------------------------------------------------
@@ -75,196 +56,194 @@ export type AppEvent =
 export function reduce(state: AppState, event: AppEvent): AppState {
   switch (event.type) {
 
-    case 'QUERY_SUBMITTED':
-      return {
-        ...initialState(),
-        loading: true,
-        tree: { root_id: event.rootNode.id, nodes: { [event.rootNode.id]: event.rootNode } },
-      };
-
-    case 'ROOT_ANALYZED':
+    case 'GRAPH_LOADED':
       return {
         ...state,
-        loading: false,
-        error: undefined,
-        rootRef: { problem: event.problem, analysis: event.analysis },
-        screen: { tag: 'root_review', problem: event.problem, analysis: event.analysis },
+        graph: event.graph,
+        screen: { tag: 'browse' },
+        focusNodeId: event.graph.root_ids[0] ?? null,
       };
 
-    case 'REFINE_ROOT_STARTED':
-      return { ...state, loading: true };
+    case 'NODE_CREATED': {
+      if (!state.graph) return state;
+      const node = event.node;
+      const nodes = { ...state.graph.nodes, [node.id]: node };
 
-    case 'ROOT_APPROVED':
-      return {
-        ...state,
-        tree: event.tree,
-        traversalQueue: [event.rootId],
-        traversalSeen: 0,
-      };
-
-    case 'TRAVERSAL_NODE_LOADING':
-      return {
-        ...state,
-        loading: true,
-        traversalQueue: state.traversalQueue.slice(1),
-        traversalSeen: state.traversalSeen + 1,
-        screen: { tag: 'traversing', tree: state.tree!, currentId: event.nodeId, nodeMarkdown: '' },
-      };
-
-    case 'NODE_ASSESSED_LEAF':
-      return {
-        ...state,
-        loading: false,
-        traversal: {
-          nodeId: event.nodeId,
-          problem: event.problem,
-          isLeaf: true,
-          queueLength: event.queueLength,
-          totalSeen: event.totalSeen,
-          pendingSchema: event.schema,
-        },
-      };
-
-    case 'NODE_ASSESSED_BRANCH':
-      return {
-        ...state,
-        loading: false,
-        traversal: {
-          nodeId: event.nodeId,
-          problem: event.problem,
-          isLeaf: false,
-          queueLength: event.queueLength,
-          totalSeen: event.totalSeen,
-          pendingSubproblems: event.subproblems,
-        },
-      };
-
-    case 'REFINE_NODE_STARTED':
-      return { ...state, loading: true };
-
-    case 'NODE_REFINED': {
-      if (!state.traversal) return state;
-      return {
-        ...state,
-        loading: false,
-        traversal: {
-          ...state.traversal,
-          ...(event.schema !== undefined ? { pendingSchema: event.schema } : {}),
-          ...(event.subproblems !== undefined ? { pendingSubproblems: event.subproblems } : {}),
-        },
-      };
-    }
-
-    case 'NODE_LEAF_COMMITTED':
-      return { ...state, traversal: null, tree: event.updatedTree };
-
-    case 'NODE_CHILDREN_ADDED':
-      return {
-        ...state,
-        traversal: null,
-        tree: event.updatedTree,
-        traversalQueue: event.updatedQueue,
-      };
-
-    case 'TRAVERSAL_COMPLETE':
-      return {
-        ...state,
-        traversal: null,
-        traversalQueue: [],
-        screen: { tag: 'explore', tree: { ...state.tree! } },
-      };
-
-    case 'BUILD_STARTED':
-      return {
-        ...state,
-        screen: { tag: 'building' },
-        buildProgress: {
-          epochs: event.initialEpochs,
-          activeEpoch: -1,
-          done: false,
-          gitEnabled: event.git,
-          outputDir: event.outputDir,
-        },
-      };
-
-    case 'BUILD_EPOCH_STARTED':
-      if (!state.buildProgress) return state;
-      return { ...state, buildProgress: { ...state.buildProgress, activeEpoch: event.epochIdx } };
-
-    case 'BUILD_NODE_STARTED':
-    case 'BUILD_NODE_GIT_STEP':
-    case 'BUILD_NODE_COMMIT':
-    case 'BUILD_NODE_DONE':
-      if (!state.buildProgress) return state;
-      return { ...state, buildProgress: patchBuildNode(state.buildProgress, event) };
-
-    case 'BUILD_GIT_ERROR':
-      if (!state.buildProgress) return state;
-      return {
-        ...state,
-        buildProgress: { ...state.buildProgress, fatalError: `git init failed: ${event.error}`, gitEnabled: false },
-      };
-
-    case 'BUILD_COMPLETE':
-      if (!state.buildProgress) return state;
-      return { ...state, buildProgress: { ...state.buildProgress, done: true, fatalError: event.fatalError } };
-
-    case 'BACK': {
-      const { screen, rootRef, tree } = state;
-      switch (screen.tag) {
-        case 'root_review':
-          return initialState();
-        case 'traversing':
-          if (!rootRef) return state;
-          return {
-            ...state,
-            tree: null,
-            traversalQueue: [],
-            traversalSeen: 0,
-            traversal: null,
-            screen: { tag: 'root_review', problem: rootRef.problem, analysis: rootRef.analysis },
-          };
-        case 'explore':
-          if (!rootRef) return state;
-          return { ...state, screen: { tag: 'root_review', problem: rootRef.problem, analysis: rootRef.analysis } };
-        case 'building':
-          if (!tree) return state;
-          return { ...state, screen: { tag: 'explore', tree: { ...tree } } };
-        default:
-          return state;
+      // Add as child of each parent
+      for (const pid of node.parent_ids) {
+        const parent = nodes[pid];
+        if (parent && !parent.children.includes(node.id)) {
+          nodes[pid] = { ...parent, children: [...parent.children, node.id] };
+        }
       }
+
+      // If no parents, this is a root
+      const root_ids = node.parent_ids.length === 0
+        ? [...state.graph.root_ids, node.id]
+        : state.graph.root_ids;
+
+      return {
+        ...state,
+        graph: { ...state.graph, nodes, root_ids },
+        screen: { tag: 'browse' },
+      };
     }
+
+    case 'NODE_UPDATED': {
+      if (!state.graph) return state;
+      const existing = state.graph.nodes[event.nodeId];
+      if (!existing) return state;
+      return {
+        ...state,
+        graph: {
+          ...state.graph,
+          nodes: {
+            ...state.graph.nodes,
+            [event.nodeId]: { ...existing, content: event.content, summary: event.summary },
+          },
+        },
+      };
+    }
+
+    case 'NODE_DELETED': {
+      if (!state.graph) return state;
+      const target = state.graph.nodes[event.nodeId];
+      if (!target) return state;
+
+      const nodes = { ...state.graph.nodes };
+      delete nodes[event.nodeId];
+
+      // Remove from parents' children lists
+      for (const pid of target.parent_ids) {
+        const parent = nodes[pid];
+        if (parent) {
+          nodes[pid] = { ...parent, children: parent.children.filter((c) => c !== event.nodeId) };
+        }
+      }
+
+      // Remove from root_ids if it was a root
+      const root_ids = state.graph.root_ids.filter((id) => id !== event.nodeId);
+
+      // Clear focus if deleted node was focused
+      const focusNodeId = state.focusNodeId === event.nodeId ? null : state.focusNodeId;
+
+      return {
+        ...state,
+        graph: { ...state.graph, nodes, root_ids },
+        focusNodeId,
+      };
+    }
+
+    case 'LINK_CREATED': {
+      if (!state.graph) return state;
+      const from = state.graph.nodes[event.fromId];
+      if (!from) return state;
+      return {
+        ...state,
+        graph: {
+          ...state.graph,
+          nodes: {
+            ...state.graph.nodes,
+            [event.fromId]: { ...from, links: [...from.links, event.link] },
+          },
+        },
+      };
+    }
+
+    case 'LINK_DELETED': {
+      if (!state.graph) return state;
+      const from = state.graph.nodes[event.fromId];
+      if (!from) return state;
+      return {
+        ...state,
+        graph: {
+          ...state.graph,
+          nodes: {
+            ...state.graph.nodes,
+            [event.fromId]: {
+              ...from,
+              links: from.links.filter(
+                (l) => !(l.target === event.targetId && l.relation === event.relation),
+              ),
+            },
+          },
+        },
+      };
+    }
+
+    case 'NODE_RESTRUCTURED': {
+      if (!state.graph) return state;
+      const node = state.graph.nodes[event.nodeId];
+      const oldParent = state.graph.nodes[event.oldParentId];
+      const newParent = state.graph.nodes[event.newParentId];
+      if (!node || !oldParent || !newParent) return state;
+
+      const nodes = { ...state.graph.nodes };
+
+      // Update node's parent_ids
+      nodes[event.nodeId] = {
+        ...node,
+        parent_ids: node.parent_ids
+          .filter((pid) => pid !== event.oldParentId)
+          .concat(event.newParentId),
+      };
+
+      // Remove from old parent's children
+      nodes[event.oldParentId] = {
+        ...oldParent,
+        children: oldParent.children.filter((c) => c !== event.nodeId),
+      };
+
+      // Add to new parent's children
+      if (!newParent.children.includes(event.nodeId)) {
+        nodes[event.newParentId] = {
+          ...newParent,
+          children: [...newParent.children, event.nodeId],
+        };
+      }
+
+      return { ...state, graph: { ...state.graph, nodes } };
+    }
+
+    case 'SUMMARY_UPDATED': {
+      if (!state.graph) return state;
+      const existing = state.graph.nodes[event.nodeId];
+      if (!existing) return state;
+      return {
+        ...state,
+        graph: {
+          ...state.graph,
+          nodes: {
+            ...state.graph.nodes,
+            [event.nodeId]: { ...existing, summary: event.summary },
+          },
+        },
+      };
+    }
+
+    case 'EXPLORATION_UPDATED': {
+      if (!state.graph) return state;
+      const existing = state.graph.nodes[event.nodeId];
+      if (!existing) return state;
+      return {
+        ...state,
+        graph: {
+          ...state.graph,
+          nodes: {
+            ...state.graph.nodes,
+            [event.nodeId]: {
+              ...existing,
+              exploration: [...existing.exploration, event.entry],
+            },
+          },
+        },
+      };
+    }
+
+    case 'FOCUS_CHANGED':
+      return { ...state, focusNodeId: event.nodeId };
 
     case 'ERROR':
       return { ...state, loading: false, error: event.message };
-  }
-}
-
-// ---- Helpers --------------------------------------------------------------
-
-type BuildNodeEvent = Extract<AppEvent,
-  { type: 'BUILD_NODE_STARTED' | 'BUILD_NODE_GIT_STEP' | 'BUILD_NODE_COMMIT' | 'BUILD_NODE_DONE' }>;
-
-function patchBuildNode(progress: BuildProgress, event: BuildNodeEvent): BuildProgress {
-  const patch = (nodeId: string, update: Partial<NodeBuildStatus>): BuildProgress => ({
-    ...progress,
-    epochs: progress.epochs.map((e) => ({
-      ...e,
-      nodes: e.nodes.map((n) => n.nodeId === nodeId ? { ...n, ...update } : n),
-    })),
-  });
-
-  switch (event.type) {
-    case 'BUILD_NODE_STARTED':  return patch(event.nodeId, { status: 'running' });
-    case 'BUILD_NODE_GIT_STEP': return patch(event.nodeId, { gitStep: event.step });
-    case 'BUILD_NODE_COMMIT':   return patch(event.nodeId, { commitCount: event.commitCount });
-    case 'BUILD_NODE_DONE':     return patch(event.nodeId, {
-      status: event.status,
-      outputPath: event.outputPath,
-      error: event.error,
-      branchName: event.branchName,
-      commitCount: event.commitCount,
-      gitStep: undefined,
-    });
   }
 }
