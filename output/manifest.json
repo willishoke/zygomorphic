@@ -1,0 +1,6 @@
+{
+  "0": {
+    "problem": "build a website for exploring a topic. the user can enter a topic they are interested in, then it generates a knowledge graph with simple diagrams, you can click through the knowledge graph",
+    "output": "output/build_a_website_for_exploring_a_topic_the_user.py"
+  }
+}

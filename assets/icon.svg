@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    Palette: viewer/assets/palette.yaml
+    root      #e2e8f0 / #f8fafc
+    path      #c026d3 / #d946ef
+    unvisited #334155 / #475569
+    target    #d97706 / #fbbf24
+  -->
+  <defs>
+    <radialGradient id="bg" cx="40%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#141428"/>
+      <stop offset="100%" stop-color="#08080f"/>
+    </radialGradient>
+    <radialGradient id="ng-root" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </radialGradient>
+    <radialGradient id="ng-path" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#d946ef"/>
+      <stop offset="100%" stop-color="#c026d3"/>
+    </radialGradient>
+    <radialGradient id="ng-unvisited" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </radialGradient>
+    <radialGradient id="ng-target" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </radialGradient>
+    <filter id="blur-sm" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <filter id="blur-md" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <filter id="blur-lg" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="28"/>
+    </filter>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="55%" stop-color="transparent"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.55"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="200" fill="url(#bg)"/>
+
+  <!--
+    9 nodes, all 34×34:
+
+    Root  (490, 155)
+    ├── L   (235, 330)
+    │   ├── LL  (140, 505)    leaf depth 2
+    │   └── LR  (322, 520)    leaf depth 2
+    └── R   (735, 318) ★
+        ├── RL  (608, 495) ★
+        │   ├── RLL (510, 665)   leaf depth 3
+        │   └── RLR (658, 678) ★
+        │       └── RLRL (618, 840) ★  TARGET depth 4
+        └── RR  (874, 482)    leaf depth 2
+  -->
+
+  <!-- EDGES — glow -->
+  <g filter="url(#blur-sm)" opacity="0.35">
+    <line x1="490" y1="155" x2="235" y2="330" stroke="#475569" stroke-width="5"/>
+    <line x1="235" y1="330" x2="140" y2="505" stroke="#475569" stroke-width="4"/>
+    <line x1="235" y1="330" x2="322" y2="520" stroke="#475569" stroke-width="4"/>
+    <line x1="608" y1="495" x2="510" y2="665" stroke="#475569" stroke-width="4"/>
+    <line x1="735" y1="318" x2="874" y2="482" stroke="#475569" stroke-width="4"/>
+    <line x1="490" y1="155" x2="735" y2="318" stroke="#e879f9" stroke-width="8"/>
+    <line x1="735" y1="318" x2="608" y2="495" stroke="#e879f9" stroke-width="7"/>
+    <line x1="608" y1="495" x2="658" y2="678" stroke="#e879f9" stroke-width="6"/>
+    <line x1="658" y1="678" x2="618" y2="840" stroke="#e879f9" stroke-width="5"/>
+  </g>
+
+  <!-- EDGES — crisp unvisited -->
+  <g stroke="#475569" stroke-width="1.5" opacity="0.5">
+    <line x1="490" y1="155" x2="235" y2="330"/>
+    <line x1="235" y1="330" x2="140" y2="505"/>
+    <line x1="235" y1="330" x2="322" y2="520"/>
+    <line x1="608" y1="495" x2="510" y2="665"/>
+    <line x1="735" y1="318" x2="874" y2="482"/>
+  </g>
+
+  <!-- EDGES — crisp search path -->
+  <g stroke="#e879f9" opacity="0.8">
+    <line x1="490" y1="155" x2="735" y2="318" stroke-width="2"/>
+    <line x1="735" y1="318" x2="608" y2="495" stroke-width="2"/>
+    <line x1="608" y1="495" x2="658" y2="678" stroke-width="1.5"/>
+    <line x1="658" y1="678" x2="618" y2="840" stroke-width="1.5"/>
+  </g>
+
+  <!-- NODE HALOS -->
+  <rect x="456" y="121" width="68" height="68" rx="8" fill="#94a3b8" filter="url(#blur-lg)" opacity="0.4"/>
+  <rect x="701" y="284" width="68" height="68" rx="8" fill="#c026d3" filter="url(#blur-md)" opacity="0.65"/>
+  <rect x="574" y="461" width="68" height="68" rx="8" fill="#c026d3" filter="url(#blur-md)" opacity="0.55"/>
+  <rect x="624" y="644" width="68" height="68" rx="8" fill="#c026d3" filter="url(#blur-md)" opacity="0.5"/>
+  <rect x="584" y="806" width="68" height="68" rx="8" fill="#d97706" filter="url(#blur-md)" opacity="0.7"/>
+  <rect x="201" y="296" width="68" height="68" rx="8" fill="#334155" filter="url(#blur-sm)" opacity="0.5"/>
+  <rect x="106" y="471" width="68" height="68" rx="8" fill="#334155" filter="url(#blur-sm)" opacity="0.4"/>
+  <rect x="288" y="486" width="68" height="68" rx="8" fill="#334155" filter="url(#blur-sm)" opacity="0.4"/>
+  <rect x="476" y="631" width="68" height="68" rx="8" fill="#334155" filter="url(#blur-sm)" opacity="0.38"/>
+  <rect x="840" y="448" width="68" height="68" rx="8" fill="#334155" filter="url(#blur-sm)" opacity="0.4"/>
+
+  <!-- ALL NODES 34×34 rx=5 -->
+
+  <!-- Root (490, 155) -->
+  <rect x="473" y="138" width="34" height="34" rx="5" fill="url(#ng-root)"/>
+  <rect x="473" y="138" width="34" height="34" rx="5" fill="none" stroke="#f8fafc" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- R (735, 318) path -->
+  <rect x="718" y="301" width="34" height="34" rx="5" fill="url(#ng-path)"/>
+  <rect x="718" y="301" width="34" height="34" rx="5" fill="none" stroke="#f0abfc" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- RL (608, 495) path -->
+  <rect x="591" y="478" width="34" height="34" rx="5" fill="url(#ng-path)"/>
+  <rect x="591" y="478" width="34" height="34" rx="5" fill="none" stroke="#f0abfc" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- RLR (658, 678) path -->
+  <rect x="641" y="661" width="34" height="34" rx="5" fill="url(#ng-path)"/>
+  <rect x="641" y="661" width="34" height="34" rx="5" fill="none" stroke="#f0abfc" stroke-width="1.5" opacity="0.55"/>
+
+  <!-- RLRL (618, 840) target -->
+  <rect x="601" y="823" width="34" height="34" rx="5" fill="url(#ng-target)"/>
+  <rect x="601" y="823" width="34" height="34" rx="5" fill="none" stroke="#fde68a" stroke-width="2"/>
+
+  <!-- L (235, 330) unvisited -->
+  <rect x="218" y="313" width="34" height="34" rx="5" fill="url(#ng-unvisited)"/>
+  <rect x="218" y="313" width="34" height="34" rx="5" fill="none" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+
+  <!-- LL (140, 505) unvisited -->
+  <rect x="123" y="488" width="34" height="34" rx="5" fill="url(#ng-unvisited)"/>
+  <rect x="123" y="488" width="34" height="34" rx="5" fill="none" stroke="#64748b" stroke-width="1" opacity="0.4"/>
+
+  <!-- LR (322, 520) unvisited -->
+  <rect x="305" y="503" width="34" height="34" rx="5" fill="url(#ng-unvisited)"/>
+  <rect x="305" y="503" width="34" height="34" rx="5" fill="none" stroke="#64748b" stroke-width="1" opacity="0.4"/>
+
+  <!-- RLL (510, 665) unvisited -->
+  <rect x="493" y="648" width="34" height="34" rx="5" fill="url(#ng-unvisited)"/>
+  <rect x="493" y="648" width="34" height="34" rx="5" fill="none" stroke="#64748b" stroke-width="1" opacity="0.4"/>
+
+  <!-- RR (874, 482) unvisited -->
+  <rect x="857" y="465" width="34" height="34" rx="5" fill="url(#ng-unvisited)"/>
+  <rect x="857" y="465" width="34" height="34" rx="5" fill="none" stroke="#64748b" stroke-width="1" opacity="0.4"/>
+
+  <rect width="1024" height="1024" rx="200" fill="url(#vignette)"/>
+</svg>

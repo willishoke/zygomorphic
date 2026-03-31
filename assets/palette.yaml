@@ -1,0 +1,32 @@
+# Anamorphic icon palette
+# Colorblind-safe: magenta + yellow distinguishable across deuteranopia/protanopia/tritanopia
+# Semantic roles map to the search-tree narrative the icon tells.
+
+roles:
+  root:
+    base: "#e2e8f0"
+    light: "#f8fafc"
+    semantic: "Entry point — where traversal begins"
+
+  path:
+    base: "#c026d3"
+    light: "#d946ef"
+    semantic: "Nodes visited along the active search path"
+
+  unvisited:
+    base: "#334155"
+    light: "#475569"
+    semantic: "Nodes not on the search path"
+
+  target:
+    base: "#d97706"
+    light: "#fbbf24"
+    semantic: "Found node — the result of the search"
+
+edges:
+  path:
+    color: "#e879f9"
+    semantic: "Edge on the active search path"
+  unvisited:
+    color: "#475569"
+    semantic: "Edge not on the search path"
