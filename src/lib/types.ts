@@ -1,10 +1,5 @@
 // ---- Graph data model ------------------------------------------------------
 
-export interface Link {
-  target: string;
-  relation: string;
-}
-
 export interface ExplorationEntry {
   agent: string;
   timestamp: number;
@@ -15,16 +10,31 @@ export interface NodeData {
   id: string;
   content: string;
   summary: string;
-  parent_ids: string[];
-  children: string[];
-  links: Link[];
-  depth: number;
   exploration: ExplorationEntry[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Edge {
+  id: string;
+  a: string;
+  b: string;
+  label: string;
+  created_at: string;
+}
+
+export interface Comment {
+  id: string;
+  node_id: string;
+  content: string;
+  author: string;
+  created_at: string;
+  expires_at: string | null;
 }
 
 export interface GraphData {
-  root_ids: string[];
   nodes: Record<string, NodeData>;
+  edges: Record<string, Edge>;
 }
 
 // ---- App state machine -----------------------------------------------------
@@ -41,4 +51,6 @@ export interface WebState {
   error?: string;
   graph: GraphData | null;
   focusNodeId: string | null;
+  focalComments: Comment[];
+  navigationHistory: string[];
 }
