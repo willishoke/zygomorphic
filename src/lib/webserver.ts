@@ -6,8 +6,6 @@ import fs from 'fs';
 import path from 'path';
 import type { Orchestrator } from './orchestrator.js';
 
-// Resolve HTML relative to CWD so the same source file is served whether
-// running from source or from a compiled dist/.
 const HTML_PATH = path.join(process.cwd(), 'src/web/index.html');
 
 let clients: http.ServerResponse[] = [];
@@ -16,7 +14,7 @@ let cachedState = '{}';
 export function createWebServer(port = 7777, orch?: Orchestrator): http.Server {
   if (orch) {
     orch.on('state', (s: unknown) => pushState(s));
-    pushState(orch.getState()); // seed initial state
+    pushState(orch.getState());
   }
 
   const server = http.createServer((req, res) => {
@@ -65,11 +63,14 @@ export function createWebServer(port = 7777, orch?: Orchestrator): http.Server {
           res.end(JSON.stringify({ error: 'bad json' }));
           return;
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true }));
-        if (orch && action.type === 'focus' && typeof action.nodeId === 'string') {
-          orch.dispatch({ type: 'FOCUS_CHANGED', nodeId: action.nodeId });
-        }
+
+        handleAction(orch, action).then(() => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        }).catch((err) => {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: String(err) }));
+        });
       });
       return;
     }
@@ -83,6 +84,47 @@ export function createWebServer(port = 7777, orch?: Orchestrator): http.Server {
 
   server.listen(port);
   return server;
+}
+
+async function handleAction(orch: Orchestrator, action: Record<string, unknown>): Promise<void> {
+  switch (action.type) {
+    case 'focus':
+      if (typeof action.nodeId === 'string') {
+        await orch.dispatch({ type: 'FOCUS_CHANGED', nodeId: action.nodeId });
+      }
+      break;
+    case 'navigate':
+      if (typeof action.nodeId === 'string') {
+        await orch.dispatch({ type: 'NAVIGATION_PUSH', nodeId: action.nodeId });
+      }
+      break;
+    case 'navigate_back':
+      await orch.dispatch({ type: 'NAVIGATION_BACK' });
+      break;
+    case 'add_comment':
+      if (
+        typeof action.node_id === 'string'
+        && typeof action.content === 'string'
+        && typeof action.author === 'string'
+      ) {
+        const now = new Date();
+        const expiresIn = typeof action.expires_in_hours === 'number'
+          ? new Date(now.getTime() + action.expires_in_hours * 3600_000).toISOString()
+          : null;
+        await orch.dispatch({
+          type: 'COMMENT_ADDED',
+          comment: {
+            id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            node_id: action.node_id,
+            content: action.content,
+            author: action.author,
+            created_at: now.toISOString(),
+            expires_at: expiresIn,
+          },
+        });
+      }
+      break;
+  }
 }
 
 export function pushState(state: unknown): void {

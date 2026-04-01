@@ -2,34 +2,71 @@
  * Orchestrator: coordinates async work and dispatches events to the pure
  * reducer. All state lives in this.state; transitions are handled by
  * reduce(). Emits 'state' events with WebState for the web server.
+ *
+ * Write events are persisted to Postgres after the reducer runs.
  */
 import { EventEmitter } from 'events';
-import { LLMClient } from './llm.js';
-import { WebState } from './types.js';
+import { WebState, Comment } from './types.js';
 import { AppState, AppEvent, initialState, reduce } from './state.js';
-
-// --------------------------------------------------------------------------
+import * as db from './db.js';
 
 export class Orchestrator extends EventEmitter {
-  llm = new LLMClient();
   private state: AppState = initialState();
 
-  // ---- Dispatch & snapshot -------------------------------------------------
-
-  dispatch(event: AppEvent): void {
+  async dispatch(event: AppEvent): Promise<void> {
     this.state = reduce(this.state, event);
+    await this.persist(event);
+
+    // Load comments when focus changes
+    if (
+      (event.type === 'NAVIGATION_PUSH' || event.type === 'FOCUS_CHANGED')
+      && this.state.focusNodeId
+    ) {
+      const comments = await db.getComments(this.state.focusNodeId);
+      this.state = reduce(this.state, { type: 'COMMENTS_LOADED', comments });
+    }
+
     this.emit('state', this.getState());
   }
 
   getState(): WebState {
-    const { screen, loading, error, graph, focusNodeId } = this.state;
-
+    const { screen, loading, error, graph, focusNodeId, focalComments, navigationHistory } = this.state;
     return {
       screen: screen.tag,
       loading,
       error,
       graph,
       focusNodeId,
+      focalComments,
+      navigationHistory,
     };
+  }
+
+  private async persist(event: AppEvent): Promise<void> {
+    try {
+      switch (event.type) {
+        case 'NODE_CREATED':
+          await db.insertNode(event.node);
+          break;
+        case 'NODE_UPDATED':
+          await db.updateNode(event.nodeId, event.content, event.summary);
+          break;
+        case 'NODE_DELETED':
+          await db.deleteNode(event.nodeId);
+          break;
+        case 'EDGE_CREATED':
+          await db.insertEdge(event.edge);
+          break;
+        case 'EDGE_DELETED':
+          await db.deleteEdge(event.edgeId);
+          break;
+        case 'COMMENT_ADDED':
+          await db.insertComment(event.comment);
+          break;
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.state = reduce(this.state, { type: 'ERROR', message: `DB error: ${message}` });
+    }
   }
 }
