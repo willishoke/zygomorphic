@@ -5,7 +5,7 @@
  */
 
 import {
-  AppScreen, GraphData, NodeData, Link, ExplorationEntry,
+  AppScreen, GraphData, NodeData, Edge, Comment, ExplorationEntry,
 } from './types.js';
 
 // ---- State ----------------------------------------------------------------
@@ -16,6 +16,8 @@ export interface AppState {
   error: string | undefined;
   graph: GraphData | null;
   focusNodeId: string | null;
+  focalComments: Comment[];
+  navigationHistory: string[];
 }
 
 export function initialState(): AppState {
@@ -25,6 +27,8 @@ export function initialState(): AppState {
     error: undefined,
     graph: null,
     focusNodeId: null,
+    focalComments: [],
+    navigationHistory: [],
   };
 }
 
@@ -37,16 +41,17 @@ export type AppEvent =
   | { type: 'NODE_CREATED'; node: NodeData }
   | { type: 'NODE_UPDATED'; nodeId: string; content: string; summary: string }
   | { type: 'NODE_DELETED'; nodeId: string }
-  // Links
-  | { type: 'LINK_CREATED'; fromId: string; link: Link }
-  | { type: 'LINK_DELETED'; fromId: string; targetId: string; relation: string }
-  // Structure
-  | { type: 'NODE_RESTRUCTURED'; nodeId: string; oldParentId: string; newParentId: string }
-  // Summary propagation
-  | { type: 'SUMMARY_UPDATED'; nodeId: string; summary: string }
+  // Edges
+  | { type: 'EDGE_CREATED'; edge: Edge }
+  | { type: 'EDGE_DELETED'; edgeId: string }
+  // Comments
+  | { type: 'COMMENTS_LOADED'; comments: Comment[] }
+  | { type: 'COMMENT_ADDED'; comment: Comment }
   // Exploration
   | { type: 'EXPLORATION_UPDATED'; nodeId: string; entry: ExplorationEntry }
   // Navigation
+  | { type: 'NAVIGATION_PUSH'; nodeId: string }
+  | { type: 'NAVIGATION_BACK' }
   | { type: 'FOCUS_CHANGED'; nodeId: string | null }
   // Cross-cutting
   | { type: 'ERROR'; message: string };
@@ -56,35 +61,24 @@ export type AppEvent =
 export function reduce(state: AppState, event: AppEvent): AppState {
   switch (event.type) {
 
-    case 'GRAPH_LOADED':
+    case 'GRAPH_LOADED': {
+      const nodeIds = Object.keys(event.graph.nodes);
       return {
         ...state,
         graph: event.graph,
         screen: { tag: 'browse' },
-        focusNodeId: event.graph.root_ids[0] ?? null,
+        focusNodeId: nodeIds[0] ?? null,
       };
+    }
 
     case 'NODE_CREATED': {
       if (!state.graph) return state;
-      const node = event.node;
-      const nodes = { ...state.graph.nodes, [node.id]: node };
-
-      // Add as child of each parent
-      for (const pid of node.parent_ids) {
-        const parent = nodes[pid];
-        if (parent && !parent.children.includes(node.id)) {
-          nodes[pid] = { ...parent, children: [...parent.children, node.id] };
-        }
-      }
-
-      // If no parents, this is a root
-      const root_ids = node.parent_ids.length === 0
-        ? [...state.graph.root_ids, node.id]
-        : state.graph.root_ids;
-
       return {
         ...state,
-        graph: { ...state.graph, nodes, root_ids },
+        graph: {
+          ...state.graph,
+          nodes: { ...state.graph.nodes, [event.node.id]: event.node },
+        },
         screen: { tag: 'browse' },
       };
     }
@@ -99,7 +93,12 @@ export function reduce(state: AppState, event: AppEvent): AppState {
           ...state.graph,
           nodes: {
             ...state.graph.nodes,
-            [event.nodeId]: { ...existing, content: event.content, summary: event.summary },
+            [event.nodeId]: {
+              ...existing,
+              content: event.content,
+              summary: event.summary,
+              updated_at: new Date().toISOString(),
+            },
           },
         },
       };
@@ -107,119 +106,56 @@ export function reduce(state: AppState, event: AppEvent): AppState {
 
     case 'NODE_DELETED': {
       if (!state.graph) return state;
-      const target = state.graph.nodes[event.nodeId];
-      if (!target) return state;
+      if (!state.graph.nodes[event.nodeId]) return state;
 
       const nodes = { ...state.graph.nodes };
       delete nodes[event.nodeId];
 
-      // Remove from parents' children lists
-      for (const pid of target.parent_ids) {
-        const parent = nodes[pid];
-        if (parent) {
-          nodes[pid] = { ...parent, children: parent.children.filter((c) => c !== event.nodeId) };
+      // Remove all edges referencing this node
+      const edges = { ...state.graph.edges };
+      for (const [eid, edge] of Object.entries(edges)) {
+        if (edge.a === event.nodeId || edge.b === event.nodeId) {
+          delete edges[eid];
         }
       }
 
-      // Remove from root_ids if it was a root
-      const root_ids = state.graph.root_ids.filter((id) => id !== event.nodeId);
-
-      // Clear focus if deleted node was focused
       const focusNodeId = state.focusNodeId === event.nodeId ? null : state.focusNodeId;
+      const navigationHistory = state.navigationHistory.filter((id) => id !== event.nodeId);
 
       return {
         ...state,
-        graph: { ...state.graph, nodes, root_ids },
+        graph: { ...state.graph, nodes, edges },
         focusNodeId,
+        navigationHistory,
       };
     }
 
-    case 'LINK_CREATED': {
+    case 'EDGE_CREATED': {
       if (!state.graph) return state;
-      const from = state.graph.nodes[event.fromId];
-      if (!from) return state;
       return {
         ...state,
         graph: {
           ...state.graph,
-          nodes: {
-            ...state.graph.nodes,
-            [event.fromId]: { ...from, links: [...from.links, event.link] },
-          },
+          edges: { ...state.graph.edges, [event.edge.id]: event.edge },
         },
       };
     }
 
-    case 'LINK_DELETED': {
+    case 'EDGE_DELETED': {
       if (!state.graph) return state;
-      const from = state.graph.nodes[event.fromId];
-      if (!from) return state;
+      const edges = { ...state.graph.edges };
+      delete edges[event.edgeId];
       return {
         ...state,
-        graph: {
-          ...state.graph,
-          nodes: {
-            ...state.graph.nodes,
-            [event.fromId]: {
-              ...from,
-              links: from.links.filter(
-                (l) => !(l.target === event.targetId && l.relation === event.relation),
-              ),
-            },
-          },
-        },
+        graph: { ...state.graph, edges },
       };
     }
 
-    case 'NODE_RESTRUCTURED': {
-      if (!state.graph) return state;
-      const node = state.graph.nodes[event.nodeId];
-      const oldParent = state.graph.nodes[event.oldParentId];
-      const newParent = state.graph.nodes[event.newParentId];
-      if (!node || !oldParent || !newParent) return state;
+    case 'COMMENTS_LOADED':
+      return { ...state, focalComments: event.comments };
 
-      const nodes = { ...state.graph.nodes };
-
-      // Update node's parent_ids
-      nodes[event.nodeId] = {
-        ...node,
-        parent_ids: node.parent_ids
-          .filter((pid) => pid !== event.oldParentId)
-          .concat(event.newParentId),
-      };
-
-      // Remove from old parent's children
-      nodes[event.oldParentId] = {
-        ...oldParent,
-        children: oldParent.children.filter((c) => c !== event.nodeId),
-      };
-
-      // Add to new parent's children
-      if (!newParent.children.includes(event.nodeId)) {
-        nodes[event.newParentId] = {
-          ...newParent,
-          children: [...newParent.children, event.nodeId],
-        };
-      }
-
-      return { ...state, graph: { ...state.graph, nodes } };
-    }
-
-    case 'SUMMARY_UPDATED': {
-      if (!state.graph) return state;
-      const existing = state.graph.nodes[event.nodeId];
-      if (!existing) return state;
-      return {
-        ...state,
-        graph: {
-          ...state.graph,
-          nodes: {
-            ...state.graph.nodes,
-            [event.nodeId]: { ...existing, summary: event.summary },
-          },
-        },
-      };
-    }
+    case 'COMMENT_ADDED':
+      return { ...state, focalComments: [...state.focalComments, event.comment] };
 
     case 'EXPLORATION_UPDATED': {
       if (!state.graph) return state;
@@ -237,6 +173,23 @@ export function reduce(state: AppState, event: AppEvent): AppState {
             },
           },
         },
+      };
+    }
+
+    case 'NAVIGATION_PUSH':
+      return {
+        ...state,
+        focusNodeId: event.nodeId,
+        navigationHistory: [...state.navigationHistory, event.nodeId],
+      };
+
+    case 'NAVIGATION_BACK': {
+      if (state.navigationHistory.length <= 1) return state;
+      const history = state.navigationHistory.slice(0, -1);
+      return {
+        ...state,
+        focusNodeId: history[history.length - 1] ?? null,
+        navigationHistory: history,
       };
     }
 

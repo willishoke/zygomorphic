@@ -1,34 +1,33 @@
 /**
  * MCP server exposing graph navigation and mutation tools.
  *
- * Agents interact with the graph through these 10 tools. Each tool
+ * Agents interact with the graph through these tools. Each tool
  * delegates to the orchestrator's state machine via dispatch().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import type { GraphData, NodeData } from './types.js';
+import type { GraphData, NodeData, Edge } from './types.js';
 import type { AppEvent } from './state.js';
 
 // ---------------------------------------------------------------------------
-// Graph accessor — the MCP server reads from and writes to this reference.
-// Call setGraph() to wire it up to the orchestrator's live state.
+// Graph accessor
 // ---------------------------------------------------------------------------
 
 let _graph: GraphData | null = null;
-let _dispatch: ((event: AppEvent) => void) | null = null;
+let _dispatch: ((event: AppEvent) => void | Promise<void>) | null = null;
 
 export function setGraph(graph: GraphData | null): void { _graph = graph; }
-export function setDispatch(fn: (event: AppEvent) => void): void { _dispatch = fn; }
+export function setDispatch(fn: (event: AppEvent) => void | Promise<void>): void { _dispatch = fn; }
 
 function graph(): GraphData {
   if (!_graph) throw new Error('No graph loaded');
   return _graph;
 }
 
-function dispatch(event: AppEvent): void {
+async function dispatch(event: AppEvent): Promise<void> {
   if (!_dispatch) throw new Error('No dispatch function set');
-  _dispatch(event);
+  await _dispatch(event);
 }
 
 // ---------------------------------------------------------------------------
@@ -36,8 +35,47 @@ function dispatch(event: AppEvent): void {
 // ---------------------------------------------------------------------------
 
 let _idCounter = 0;
-function nextId(): string {
-  return `n_${Date.now()}_${++_idCounter}`;
+function nextId(prefix = 'n'): string {
+  return `${prefix}_${Date.now()}_${++_idCounter}`;
+}
+
+// ---------------------------------------------------------------------------
+// Neighborhood BFS (direction-agnostic)
+// ---------------------------------------------------------------------------
+
+interface LeveledNode { id: string; level: number; }
+
+function collectNeighborhood(g: GraphData, focalId: string, maxDepth: number): {
+  nodes: LeveledNode[];
+  edges: Edge[];
+} {
+  const visited = new Set<string>([focalId]);
+  const result: LeveledNode[] = [];
+  const relevantEdges: Edge[] = [];
+  let frontier = [focalId];
+
+  for (let level = 1; level <= maxDepth && frontier.length > 0; level++) {
+    const nextFrontier: string[] = [];
+    for (const id of frontier) {
+      for (const edge of Object.values(g.edges)) {
+        let neighbor: string | null = null;
+        if (edge.a === id) neighbor = edge.b;
+        else if (edge.b === id) neighbor = edge.a;
+        if (neighbor && !visited.has(neighbor) && g.nodes[neighbor]) {
+          visited.add(neighbor);
+          nextFrontier.push(neighbor);
+          result.push({ id: neighbor, level });
+        }
+        // Collect edge if it touches the focal or any visited node
+        if (neighbor !== null && !relevantEdges.includes(edge)) {
+          relevantEdges.push(edge);
+        }
+      }
+    }
+    frontier = nextFrontier;
+  }
+
+  return { nodes: result, edges: relevantEdges };
 }
 
 // ---------------------------------------------------------------------------
@@ -47,25 +85,24 @@ function nextId(): string {
 export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: 'zygomorphic',
-    version: '0.1.0',
+    version: '0.2.0',
   });
 
   // ---- get_overview --------------------------------------------------------
   server.tool(
     'get_overview',
-    'Top-level summary of the entire graph',
+    'Summary of the entire graph: all nodes with summaries',
     {},
     async () => {
       const g = graph();
-      const rootSummaries = g.root_ids
-        .map((id) => {
-          const node = g.nodes[id];
-          return node ? `- [${id}] ${node.summary}` : `- [${id}] (missing)`;
-        })
-        .join('\n');
+      const entries = Object.values(g.nodes);
+      if (entries.length === 0) {
+        return { content: [{ type: 'text', text: 'Graph is empty' }] };
+      }
 
-      const nodeCount = Object.keys(g.nodes).length;
-      const text = `Graph: ${nodeCount} nodes, ${g.root_ids.length} roots\n\n${rootSummaries}`;
+      const lines = entries.map((n) => `- [${n.id}] ${n.summary}`);
+      const edgeCount = Object.keys(g.edges).length;
+      const text = `Graph: ${entries.length} nodes, ${edgeCount} edges\n\n${lines.join('\n')}`;
       return { content: [{ type: 'text', text }] };
     },
   );
@@ -73,72 +110,67 @@ export function createMcpServer(): McpServer {
   // ---- get_node ------------------------------------------------------------
   server.tool(
     'get_node',
-    'Full content and metadata for a specific node',
+    'Full content, metadata, edges, and exploration for a node',
     { id: z.string().describe('Node ID') },
-    async ({ id }) => {
-      const node = graph().nodes[id];
-      if (!node) return { content: [{ type: 'text', text: `Node '${id}' not found` }], isError: true };
-      return { content: [{ type: 'text', text: JSON.stringify(node, null, 2) }] };
-    },
-  );
-
-  // ---- list_children -------------------------------------------------------
-  server.tool(
-    'list_children',
-    'One level of children with their summaries',
-    { id: z.string().describe('Parent node ID') },
     async ({ id }) => {
       const g = graph();
       const node = g.nodes[id];
       if (!node) return { content: [{ type: 'text', text: `Node '${id}' not found` }], isError: true };
 
-      if (node.children.length === 0) {
-        return { content: [{ type: 'text', text: `Node '${id}' has no children (leaf node)` }] };
+      const edges = Object.values(g.edges).filter((e) => e.a === id || e.b === id);
+      const edgeLines = edges.map((e) => {
+        const other = e.a === id ? e.b : e.a;
+        const otherNode = g.nodes[other];
+        return `  ${e.label} → [${other}] ${otherNode?.summary ?? '(missing)'}`;
+      });
+
+      const sections = [
+        `[${id}] ${node.summary}`,
+        `\nContent:\n${node.content}`,
+      ];
+
+      if (edgeLines.length > 0) {
+        sections.push(`\nEdges (${edgeLines.length}):\n${edgeLines.join('\n')}`);
       }
 
-      const lines = node.children.map((cid) => {
-        const child = g.nodes[cid];
-        return child ? `- [${cid}] ${child.summary}` : `- [${cid}] (missing)`;
-      });
-      return { content: [{ type: 'text', text: lines.join('\n') }] };
+      if (node.exploration.length > 0) {
+        const entries = node.exploration.map((e) => {
+          const conclusion = e.conclusion ? ` — ${e.conclusion}` : '';
+          return `  ${e.agent} @ ${new Date(e.timestamp).toISOString()}${conclusion}`;
+        });
+        sections.push(`\nExploration:\n${entries.join('\n')}`);
+      }
+
+      return { content: [{ type: 'text', text: sections.join('\n') }] };
     },
   );
 
   // ---- get_neighborhood ----------------------------------------------------
   server.tool(
     'get_neighborhood',
-    'Focal node plus N levels of ancestors and descendants with summaries',
+    'Focal node plus N hops of neighbors (direction-agnostic BFS)',
     {
       id: z.string().describe('Focal node ID'),
-      depth: z.number().int().min(1).max(10).default(2).describe('Levels in each direction'),
+      depth: z.number().int().min(1).max(10).default(2).describe('Hops from focal'),
     },
     async ({ id, depth }) => {
       const g = graph();
       const focal = g.nodes[id];
       if (!focal) return { content: [{ type: 'text', text: `Node '${id}' not found` }], isError: true };
 
-      const ancestors = collectAncestors(g, id, depth);
-      const descendants = collectDescendants(g, id, depth);
+      const { nodes: neighbors } = collectNeighborhood(g, id, depth);
 
       const sections: string[] = [];
-
-      if (ancestors.length > 0) {
-        sections.push('## Ancestors');
-        for (const a of ancestors) {
-          const n = g.nodes[a.id];
-          sections.push(`${'  '.repeat(a.level)}[${a.id}] ${n?.summary ?? '(missing)'}`);
-        }
-      }
-
-      sections.push(`\n## Focus: [${id}]`);
+      sections.push(`## Focus: [${id}]`);
       sections.push(focal.summary);
       sections.push(`\nContent:\n${focal.content}`);
 
-      if (descendants.length > 0) {
-        sections.push('\n## Descendants');
-        for (const d of descendants) {
-          const n = g.nodes[d.id];
-          sections.push(`${'  '.repeat(d.level)}[${d.id}] ${n?.summary ?? '(missing)'}`);
+      if (neighbors.length > 0) {
+        sections.push(`\n## Neighbors (${neighbors.length})`);
+        for (const nb of neighbors) {
+          const n = g.nodes[nb.id];
+          const indent = '  '.repeat(nb.level - 1);
+          sections.push(`${indent}[${nb.id}] (hop ${nb.level}) ${n?.summary ?? '(missing)'}`);
         }
       }
 
@@ -152,27 +184,17 @@ export function createMcpServer(): McpServer {
     'Keyword search across node content and summaries',
     {
       query: z.string().describe('Search query'),
-      scope: z.string().optional().describe('Scope to a subtree rooted at this node ID'),
     },
-    async ({ query, scope }) => {
+    async ({ query }) => {
       const g = graph();
       const lowerQ = query.toLowerCase();
 
-      let nodeIds = Object.keys(g.nodes);
-      if (scope) {
-        const scopeIds = new Set<string>();
-        collectAllDescendantIds(g, scope, scopeIds);
-        scopeIds.add(scope);
-        nodeIds = nodeIds.filter((id) => scopeIds.has(id));
-      }
-
-      const results = nodeIds
-        .map((id) => {
-          const node = g.nodes[id]!;
+      const results = Object.values(g.nodes)
+        .map((node) => {
           const inContent = node.content.toLowerCase().includes(lowerQ);
           const inSummary = node.summary.toLowerCase().includes(lowerQ);
           if (!inContent && !inSummary) return null;
-          return { id, summary: node.summary, matchIn: inContent && inSummary ? 'both' : inContent ? 'content' : 'summary' };
+          return { id: node.id, summary: node.summary, matchIn: inContent && inSummary ? 'both' : inContent ? 'content' : 'summary' };
         })
         .filter(Boolean);
 
@@ -188,33 +210,43 @@ export function createMcpServer(): McpServer {
   // ---- create_node ---------------------------------------------------------
   server.tool(
     'create_node',
-    'Create a new node. Summary is generated automatically if not provided.',
+    'Create a new node, optionally connected to another node via a labeled edge',
     {
-      parent_id: z.string().optional().describe('Parent node ID (omit for root node)'),
       content: z.string().describe('Node content'),
-      summary: z.string().optional().describe('Summary (auto-generated if omitted)'),
+      summary: z.string().optional().describe('Summary (auto-truncated from content if omitted)'),
+      connect_to: z.string().optional().describe('Node ID to connect to via an edge'),
+      edge_label: z.string().optional().describe('Label for the connecting edge'),
     },
-    async ({ parent_id, content, summary }) => {
+    async ({ content, summary, connect_to, edge_label }) => {
       const g = graph();
-      if (parent_id && !g.nodes[parent_id]) {
-        return { content: [{ type: 'text', text: `Parent '${parent_id}' not found` }], isError: true };
+      if (connect_to && !g.nodes[connect_to]) {
+        return { content: [{ type: 'text', text: `Node '${connect_to}' not found` }], isError: true };
       }
 
-      const id = nextId();
-      const parentNode = parent_id ? g.nodes[parent_id] : null;
-
+      const now = new Date().toISOString();
+      const id = nextId('n');
       const node: NodeData = {
         id,
         content,
         summary: summary ?? content.slice(0, 120),
-        parent_ids: parent_id ? [parent_id] : [],
-        children: [],
-        links: [],
-        depth: parentNode ? parentNode.depth + 1 : 0,
         exploration: [],
+        created_at: now,
+        updated_at: now,
       };
 
-      dispatch({ type: 'NODE_CREATED', node });
+      await dispatch({ type: 'NODE_CREATED', node });
+
+      if (connect_to) {
+        const edge: Edge = {
+          id: nextId('e'),
+          a: id,
+          b: connect_to,
+          label: edge_label ?? 'related',
+          created_at: now,
+        };
+        await dispatch({ type: 'EDGE_CREATED', edge });
+      }
+
       return { content: [{ type: 'text', text: `Created node ${id}` }] };
     },
   );
@@ -222,18 +254,18 @@ export function createMcpServer(): McpServer {
   // ---- update_node ---------------------------------------------------------
   server.tool(
     'update_node',
-    'Update a node\'s content. Triggers summary regeneration.',
+    'Update a node\'s content and/or summary',
     {
       id: z.string().describe('Node ID'),
       content: z.string().describe('New content'),
-      summary: z.string().optional().describe('New summary (auto-generated if omitted)'),
+      summary: z.string().optional().describe('New summary (auto-truncated if omitted)'),
     },
     async ({ id, content, summary }) => {
       if (!graph().nodes[id]) {
         return { content: [{ type: 'text', text: `Node '${id}' not found` }], isError: true };
       }
 
-      dispatch({
+      await dispatch({
         type: 'NODE_UPDATED',
         nodeId: id,
         content,
@@ -243,46 +275,77 @@ export function createMcpServer(): McpServer {
     },
   );
 
-  // ---- link_nodes ----------------------------------------------------------
+  // ---- create_edge ---------------------------------------------------------
   server.tool(
-    'link_nodes',
-    'Create a cross-reference between two nodes',
+    'create_edge',
+    'Create an undirected labeled edge between two nodes',
     {
-      from: z.string().describe('Source node ID'),
-      to: z.string().describe('Target node ID'),
-      relation: z.string().describe('Relation type (e.g. "see_also", "depends_on")'),
+      a: z.string().describe('First node ID'),
+      b: z.string().describe('Second node ID'),
+      label: z.string().describe('Edge label (e.g. "related", "contains", "depends_on")'),
     },
-    async ({ from, to, relation }) => {
+    async ({ a, b, label }) => {
       const g = graph();
-      if (!g.nodes[from]) return { content: [{ type: 'text', text: `Node '${from}' not found` }], isError: true };
-      if (!g.nodes[to]) return { content: [{ type: 'text', text: `Node '${to}' not found` }], isError: true };
+      if (!g.nodes[a]) return { content: [{ type: 'text', text: `Node '${a}' not found` }], isError: true };
+      if (!g.nodes[b]) return { content: [{ type: 'text', text: `Node '${b}' not found` }], isError: true };
 
-      dispatch({ type: 'LINK_CREATED', fromId: from, link: { target: to, relation } });
-      return { content: [{ type: 'text', text: `Linked ${from} → ${to} (${relation})` }] };
+      const edge: Edge = {
+        id: nextId('e'),
+        a,
+        b,
+        label,
+        created_at: new Date().toISOString(),
+      };
+      await dispatch({ type: 'EDGE_CREATED', edge });
+      return { content: [{ type: 'text', text: `Created edge ${edge.id}: ${a} —[${label}]— ${b}` }] };
     },
   );
 
-  // ---- restructure ---------------------------------------------------------
+  // ---- delete_edge ---------------------------------------------------------
   server.tool(
-    'restructure',
-    'Move a node from one parent to another',
-    {
-      id: z.string().describe('Node to move'),
-      new_parent: z.string().describe('New parent node ID'),
-    },
-    async ({ id, new_parent }) => {
+    'delete_edge',
+    'Remove an edge by ID',
+    { edge_id: z.string().describe('Edge ID') },
+    async ({ edge_id }) => {
       const g = graph();
-      const node = g.nodes[id];
-      if (!node) return { content: [{ type: 'text', text: `Node '${id}' not found` }], isError: true };
-      if (!g.nodes[new_parent]) return { content: [{ type: 'text', text: `Node '${new_parent}' not found` }], isError: true };
+      if (!g.edges[edge_id]) return { content: [{ type: 'text', text: `Edge '${edge_id}' not found` }], isError: true };
+      await dispatch({ type: 'EDGE_DELETED', edgeId: edge_id });
+      return { content: [{ type: 'text', text: `Deleted edge ${edge_id}` }] };
+    },
+  );
 
-      if (node.parent_ids.length === 0) {
-        return { content: [{ type: 'text', text: `Node '${id}' is a root — cannot restructure` }], isError: true };
+  // ---- add_comment ---------------------------------------------------------
+  server.tool(
+    'add_comment',
+    'Add an ephemeral comment on a node',
+    {
+      node_id: z.string().describe('Node ID to comment on'),
+      content: z.string().describe('Comment text'),
+      author: z.string().describe('Author identifier (agent name or "human")'),
+      expires_in_hours: z.number().optional().describe('Hours until comment expires (null = permanent)'),
+    },
+    async ({ node_id, content: text, author, expires_in_hours }) => {
+      if (!graph().nodes[node_id]) {
+        return { content: [{ type: 'text', text: `Node '${node_id}' not found` }], isError: true };
       }
 
-      const oldParent = node.parent_ids[0]!;
-      dispatch({ type: 'NODE_RESTRUCTURED', nodeId: id, oldParentId: oldParent, newParentId: new_parent });
-      return { content: [{ type: 'text', text: `Moved ${id} from ${oldParent} to ${new_parent}` }] };
+      const now = new Date();
+      const expiresAt = expires_in_hours
+        ? new Date(now.getTime() + expires_in_hours * 3600_000).toISOString()
+        : null;
+
+      await dispatch({
+        type: 'COMMENT_ADDED',
+        comment: {
+          id: nextId('c'),
+          node_id,
+          content: text,
+          author,
+          created_at: now.toISOString(),
+          expires_at: expiresAt,
+        },
+      });
+      return { content: [{ type: 'text', text: `Comment added on ${node_id}` }] };
     },
   );
 
@@ -300,7 +363,7 @@ export function createMcpServer(): McpServer {
         return { content: [{ type: 'text', text: `Node '${id}' not found` }], isError: true };
       }
 
-      dispatch({
+      await dispatch({
         type: 'EXPLORATION_UPDATED',
         nodeId: id,
         entry: { agent, timestamp: Date.now(), conclusion },
@@ -340,65 +403,12 @@ export function createMcpServer(): McpServer {
 }
 
 // ---------------------------------------------------------------------------
-// Neighborhood helpers
-// ---------------------------------------------------------------------------
-
-interface LeveledNode { id: string; level: number; }
-
-function collectAncestors(g: GraphData, nodeId: string, maxDepth: number): LeveledNode[] {
-  const result: LeveledNode[] = [];
-  const visited = new Set<string>();
-
-  function walk(id: string, level: number) {
-    const node = g.nodes[id];
-    if (!node || level > maxDepth || visited.has(id)) return;
-    visited.add(id);
-    for (const pid of node.parent_ids) {
-      walk(pid, level + 1);
-      result.push({ id: pid, level });
-    }
-  }
-
-  walk(nodeId, 1);
-  return result.reverse();
-}
-
-function collectDescendants(g: GraphData, nodeId: string, maxDepth: number): LeveledNode[] {
-  const result: LeveledNode[] = [];
-  const visited = new Set<string>();
-
-  function walk(id: string, level: number) {
-    const node = g.nodes[id];
-    if (!node || level > maxDepth || visited.has(id)) return;
-    visited.add(id);
-    for (const cid of node.children) {
-      result.push({ id: cid, level });
-      walk(cid, level + 1);
-    }
-  }
-
-  walk(nodeId, 1);
-  return result;
-}
-
-function collectAllDescendantIds(g: GraphData, nodeId: string, acc: Set<string>): void {
-  const node = g.nodes[nodeId];
-  if (!node) return;
-  for (const cid of node.children) {
-    if (!acc.has(cid)) {
-      acc.add(cid);
-      collectAllDescendantIds(g, cid, acc);
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Standalone stdio entrypoint
 // ---------------------------------------------------------------------------
 
 export async function startStdioServer(
   graph: GraphData,
-  dispatchFn: (event: AppEvent) => void,
+  dispatchFn: (event: AppEvent) => void | Promise<void>,
 ): Promise<void> {
   setGraph(graph);
   setDispatch(dispatchFn);
