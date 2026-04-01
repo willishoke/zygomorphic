@@ -52,6 +52,7 @@ export async function initSchema(): Promise<void> {
       content TEXT NOT NULL,
       author TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ,
       expires_at TIMESTAMPTZ,
       deleted_at TIMESTAMPTZ
     );
@@ -71,8 +72,9 @@ export async function initSchema(): Promise<void> {
       WHERE expires_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_votes_comment ON comment_votes(comment_id);
 
-    -- Migrate existing comments table if deleted_at column is missing
+    -- Migrate existing comments table if columns are missing
     ALTER TABLE comments ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+    ALTER TABLE comments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
   `);
 }
 
@@ -186,15 +188,30 @@ export async function getComments(nodeId: string): Promise<Comment[]> {
     content: r.content,
     author: r.author,
     created_at: r.created_at.toISOString(),
+    updated_at: r.updated_at ? r.updated_at.toISOString() : null,
     expires_at: r.expires_at ? r.expires_at.toISOString() : null,
     score: r.score,
     deleted_at: null,
   }));
 }
 
+export async function getCommentAuthor(id: string): Promise<string | null> {
+  const db = getPool();
+  const { rows } = await db.query('SELECT author FROM comments WHERE id = $1', [id]);
+  return rows.length > 0 ? rows[0].author : null;
+}
+
 export async function softDeleteComment(id: string): Promise<void> {
   const db = getPool();
   await db.query('UPDATE comments SET deleted_at = now() WHERE id = $1', [id]);
+}
+
+export async function editComment(id: string, content: string): Promise<void> {
+  const db = getPool();
+  await db.query(
+    'UPDATE comments SET content = $2, updated_at = now() WHERE id = $1',
+    [id, content],
+  );
 }
 
 export async function upsertVote(

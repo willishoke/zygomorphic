@@ -29,6 +29,7 @@ export interface Comment {
   content: string;
   author: string;
   created_at: string;
+  updated_at: string | null;
   expires_at: string | null;
   score: number;
   deleted_at: string | null;

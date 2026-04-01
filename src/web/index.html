@@ -544,7 +544,36 @@ function voteComment(id, vote) {
 }
 
 function deleteComment(id) {
-  sendAction({ type: 'delete_comment', comment_id: id });
+  sendAction({ type: 'delete_comment', comment_id: id, author: 'human' });
+}
+
+function startEditComment(id, currentContent) {
+  const item = document.getElementById('comment-' + id);
+  if (!item) return;
+  const body = item.querySelector('.comment-body');
+  const actions = item.querySelector('.comment-actions');
+  body.innerHTML =
+    `<textarea id="edit-ta-${esc(id)}" style="width:100%;background:var(--bg);border:1px solid var(--cyan);color:var(--text);padding:6px 8px;border-radius:4px;font-family:inherit;font-size:13px;resize:vertical;min-height:60px">${esc(currentContent)}</textarea>`;
+  actions.innerHTML =
+    `<button class="nav-btn" style="color:var(--cyan)" onclick="saveEditComment('${esc(id)}')">save</button>` +
+    `<button class="nav-btn" onclick="cancelEditComment('${esc(id)}', ${JSON.stringify(currentContent)})">cancel</button>`;
+}
+
+function saveEditComment(id) {
+  const ta = document.getElementById('edit-ta-' + id);
+  if (!ta || !ta.value.trim()) return;
+  sendAction({ type: 'edit_comment', comment_id: id, author: 'human', content: ta.value.trim() });
+}
+
+function cancelEditComment(id, originalContent) {
+  // Re-render will happen via SSE; if not yet, restore immediately
+  const item = document.getElementById('comment-' + id);
+  if (!item) return;
+  const body = item.querySelector('.comment-body');
+  const actions = item.querySelector('.comment-actions');
+  body.innerHTML = esc(originalContent);
+  // Restore original actions — re-render handles the rest
+  render();
 }
 
 // ---------------------------------------------------------------------------
@@ -756,16 +785,21 @@ function renderFocalContent(graph, nodeId) {
       const expiring = c.expires_at
         ? ' <span class="expiring">expires ' + new Date(c.expires_at).toLocaleString() + '</span>'
         : '';
+      const edited = c.updated_at ? ' <span style="color:var(--dim)">(edited)</span>' : '';
       const scoreSign = c.score > 0 ? '+' : '';
       const scoreColor = c.score > 0 ? 'var(--green)' : c.score < 0 ? 'var(--red)' : 'var(--dim)';
-      html += '<div class="comment-item">';
-      html += '<div class="comment-meta">' + esc(c.author) + ' · ' + new Date(c.created_at).toLocaleString() + expiring + '</div>';
+      const isOwn = c.author === 'human';
+      html += `<div class="comment-item" id="comment-${esc(c.id)}">`;
+      html += '<div class="comment-meta">' + esc(c.author) + ' · ' + new Date(c.created_at).toLocaleString() + expiring + edited + '</div>';
       html += '<div class="comment-body">' + esc(c.content) + '</div>';
       html += '<div class="comment-actions">';
       html += `<button class="vote-btn" onclick="voteComment('${esc(c.id)}', 1)">↑ ${Math.max(0, c.score)}</button>`;
       html += `<button class="vote-btn" onclick="voteComment('${esc(c.id)}', -1)">↓</button>`;
       html += `<span style="font-size:12px;color:${scoreColor};margin-left:2px">${scoreSign}${c.score}</span>`;
-      html += `<button class="delete-btn" onclick="deleteComment('${esc(c.id)}')" title="delete">×</button>`;
+      if (isOwn) {
+        html += `<button class="nav-btn" style="font-size:11px;padding:1px 6px;margin-left:auto" onclick="startEditComment('${esc(c.id)}', ${JSON.stringify(c.content)})">edit</button>`;
+        html += `<button class="delete-btn" onclick="deleteComment('${esc(c.id)}')" title="delete">×</button>`;
+      }
       html += '</div>';
       html += '</div>';
     });

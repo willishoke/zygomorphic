@@ -148,7 +148,17 @@ async function handleAction(orch: Orchestrator, action: Record<string, unknown>)
       break;
     case 'delete_comment':
       if (typeof action.comment_id === 'string') {
-        await orch.deleteComment(action.comment_id);
+        const delAuthor = typeof action.author === 'string' ? action.author : 'human';
+        await orch.deleteComment(action.comment_id, delAuthor);
+      }
+      break;
+    case 'edit_comment':
+      if (
+        typeof action.comment_id === 'string'
+        && typeof action.content === 'string'
+      ) {
+        const editAuthor = typeof action.author === 'string' ? action.author : 'human';
+        await orch.editComment(action.comment_id, editAuthor, action.content);
       }
       break;
     case 'vote_comment':
@@ -178,6 +188,7 @@ async function handleAction(orch: Orchestrator, action: Record<string, unknown>)
             content: action.content,
             author: action.author,
             created_at: now.toISOString(),
+            updated_at: null,
             expires_at: expiresIn,
             score: 0,
             deleted_at: null,

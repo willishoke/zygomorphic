@@ -1,5 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import { Orchestrator } from '../src/lib/orchestrator.js';
+
+app.setName('Zygomorphic');
 import { createWebServer } from '../src/lib/webserver.js';
 import { initSchema, loadFullGraph, deleteExpiredComments, closePool } from '../src/lib/db.js';
 import type { Server } from 'http';

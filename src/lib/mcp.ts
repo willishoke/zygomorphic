@@ -16,12 +16,14 @@ import type { AppEvent } from './state.js';
 
 let _graph: GraphData | null = null;
 let _dispatch: ((event: AppEvent) => void | Promise<void>) | null = null;
-let _deleteComment: ((id: string) => Promise<void>) | null = null;
+let _deleteComment: ((id: string, author: string) => Promise<void>) | null = null;
+let _editComment: ((id: string, author: string, content: string) => Promise<void>) | null = null;
 let _voteComment: ((id: string, author: string, vote: 1 | -1) => Promise<void>) | null = null;
 
 export function setGraph(graph: GraphData | null): void { _graph = graph; }
 export function setDispatch(fn: (event: AppEvent) => void | Promise<void>): void { _dispatch = fn; }
-export function setDeleteComment(fn: (id: string) => Promise<void>): void { _deleteComment = fn; }
+export function setDeleteComment(fn: (id: string, author: string) => Promise<void>): void { _deleteComment = fn; }
+export function setEditComment(fn: (id: string, author: string, content: string) => Promise<void>): void { _editComment = fn; }
 export function setVoteComment(fn: (id: string, author: string, vote: 1 | -1) => Promise<void>): void { _voteComment = fn; }
 
 function graph(): GraphData {
@@ -346,6 +348,7 @@ export function createMcpServer(): McpServer {
           content: text,
           author,
           created_at: now.toISOString(),
+          updated_at: null,
           expires_at: expiresAt,
           score: 0,
           deleted_at: null,
@@ -358,12 +361,39 @@ export function createMcpServer(): McpServer {
   // ---- delete_comment -------------------------------------------------------
   server.tool(
     'delete_comment',
-    'Delete a comment by ID',
-    { id: z.string().describe('Comment ID') },
-    async ({ id }) => {
+    'Delete one of your own comments by ID',
+    {
+      id: z.string().describe('Comment ID'),
+      author: z.string().describe('Your agent identifier — must match the comment author'),
+    },
+    async ({ id, author }) => {
       if (!_deleteComment) throw new Error('No deleteComment function set');
-      await _deleteComment(id);
-      return { content: [{ type: 'text', text: `Deleted comment ${id}` }] };
+      try {
+        await _deleteComment(id, author);
+        return { content: [{ type: 'text', text: `Deleted comment ${id}` }] };
+      } catch (err) {
+        return { content: [{ type: 'text', text: String(err) }], isError: true };
+      }
+    },
+  );
+
+  // ---- edit_comment ---------------------------------------------------------
+  server.tool(
+    'edit_comment',
+    'Edit the content of one of your own comments',
+    {
+      id: z.string().describe('Comment ID'),
+      author: z.string().describe('Your agent identifier — must match the comment author'),
+      content: z.string().describe('New comment text'),
+    },
+    async ({ id, author, content: newContent }) => {
+      if (!_editComment) throw new Error('No editComment function set');
+      try {
+        await _editComment(id, author, newContent);
+        return { content: [{ type: 'text', text: `Edited comment ${id}` }] };
+      } catch (err) {
+        return { content: [{ type: 'text', text: String(err) }], isError: true };
+      }
     },
   );
 
@@ -444,12 +474,14 @@ export function createMcpServer(): McpServer {
 export async function startStdioServer(
   graph: GraphData,
   dispatchFn: (event: AppEvent) => void | Promise<void>,
-  deleteCommentFn?: (id: string) => Promise<void>,
+  deleteCommentFn?: (id: string, author: string) => Promise<void>,
+  editCommentFn?: (id: string, author: string, content: string) => Promise<void>,
   voteCommentFn?: (id: string, author: string, vote: 1 | -1) => Promise<void>,
 ): Promise<void> {
   setGraph(graph);
   setDispatch(dispatchFn);
   if (deleteCommentFn) setDeleteComment(deleteCommentFn);
+  if (editCommentFn) setEditComment(editCommentFn);
   if (voteCommentFn) setVoteComment(voteCommentFn);
   const server = createMcpServer();
   const transport = new StdioServerTransport();
