@@ -213,6 +213,37 @@ export async function searchNodes(query: string): Promise<NodeData[]> {
   }));
 }
 
+// ---- Poll ------------------------------------------------------------------
+
+export interface PollResult {
+  nodeCount: number;
+  edgeCount: number;
+  nodesMaxUpdated: string | null;
+  focusNodeUpdated: string | null;
+  focusCommentCount: number;
+}
+
+export async function poll(focusNodeId: string | null): Promise<PollResult> {
+  const db = getPool();
+  const { rows } = await db.query(`
+    SELECT
+      (SELECT COUNT(*)::int FROM nodes) AS node_count,
+      (SELECT COUNT(*)::int FROM edges) AS edge_count,
+      (SELECT MAX(updated_at) FROM nodes) AS nodes_max_updated,
+      (SELECT updated_at FROM nodes WHERE id = $1) AS focus_node_updated,
+      (SELECT COUNT(*)::int FROM comments
+       WHERE node_id = $1 AND (expires_at IS NULL OR expires_at > now())) AS focus_comment_count
+  `, [focusNodeId]);
+  const r = rows[0];
+  return {
+    nodeCount: r.node_count,
+    edgeCount: r.edge_count,
+    nodesMaxUpdated: r.nodes_max_updated ? r.nodes_max_updated.toISOString() : null,
+    focusNodeUpdated: r.focus_node_updated ? r.focus_node_updated.toISOString() : null,
+    focusCommentCount: r.focus_comment_count,
+  };
+}
+
 // ---- Neighborhood ----------------------------------------------------------
 
 export async function getNeighborhood(id: string): Promise<{

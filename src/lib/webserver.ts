@@ -5,6 +5,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import type { Orchestrator } from './orchestrator.js';
+import * as db from './db.js';
 
 const HTML_PATH = path.join(process.cwd(), 'src/web/index.html');
 
@@ -43,6 +44,19 @@ export function createWebServer(port = 7777, orch?: Orchestrator): http.Server {
     if (req.url === '/state') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(cachedState);
+      return;
+    }
+
+    if (req.url?.startsWith('/poll')) {
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const focusNodeId = params.get('focusNodeId');
+      db.poll(focusNodeId).then((result) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      }).catch(() => {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'poll failed' }));
+      });
       return;
     }
 
@@ -100,6 +114,12 @@ async function handleAction(orch: Orchestrator, action: Record<string, unknown>)
       break;
     case 'navigate_back':
       await orch.dispatch({ type: 'NAVIGATION_BACK' });
+      break;
+    case 'refresh':
+      await orch.reload();
+      break;
+    case 'refresh_comments':
+      await orch.reloadComments();
       break;
     case 'add_comment':
       if (

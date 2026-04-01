@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import pg from 'pg';
 import {
   getPool, initSchema, closePool,
   loadFullGraph, getNode, insertNode, updateNode, deleteNode,
@@ -18,20 +19,22 @@ function makeEdge(id: string, a: string, b: string, label: string): Edge {
   return { id, a, b, label, created_at: now };
 }
 
+const TEST_SCHEMA = 'test_' + process.pid;
+
 beforeAll(async () => {
-  await initSchema();
-  // Clean slate
   const db = getPool();
-  await db.query('DELETE FROM comments');
-  await db.query('DELETE FROM edges');
-  await db.query('DELETE FROM nodes');
+  await db.query(`CREATE SCHEMA IF NOT EXISTS ${TEST_SCHEMA}`);
+  await db.query(`SET search_path TO ${TEST_SCHEMA}`);
+  // Set search_path for every new connection in the pool
+  db.on('connect', (client: pg.PoolClient) => {
+    client.query(`SET search_path TO ${TEST_SCHEMA}`);
+  });
+  await initSchema();
 });
 
 afterAll(async () => {
   const db = getPool();
-  await db.query('DELETE FROM comments');
-  await db.query('DELETE FROM edges');
-  await db.query('DELETE FROM nodes');
+  await db.query(`DROP SCHEMA ${TEST_SCHEMA} CASCADE`);
   await closePool();
 });
 

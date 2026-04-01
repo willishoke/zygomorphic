@@ -56,24 +56,31 @@ header .node-count { color: var(--dim); font-size: 12px; margin-left: auto; }
 }
 .nav-btn:hover { color: var(--text); border-color: var(--dim); }
 .nav-btn:disabled { opacity: 0.3; cursor: default; }
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--green);
+  transition: background 0.2s;
+}
+.status-dot.stale { background: var(--yellow); }
+.status-dot.focus-stale { background: var(--red); }
+#btn-refresh {
+  display: none;
+}
+#btn-refresh.visible {
+  display: inline-block;
+}
 
-/* ---- Carousel ---- */
-.carousel-viewport {
+/* ---- Two-pane layout ---- */
+.panes {
   flex: 1;
-  overflow: hidden;
-  position: relative;
-}
-.carousel-track {
   display: flex;
-  height: 100%;
-  transition: transform 0.3s ease;
+  overflow: hidden;
 }
-.carousel-track.no-transition {
-  transition: none;
-}
-.carousel-panel {
+.pane {
   width: 50%;
-  flex-shrink: 0;
   height: 100%;
   overflow-y: auto;
 }
@@ -187,8 +194,8 @@ header .node-count { color: var(--dim); font-size: 12px; margin-left: auto; }
 .edge-item:hover { background: var(--bg3); }
 .edge-label {
   font-size: 11px;
-  color: var(--purple);
   margin-bottom: 2px;
+  font-weight: 600;
 }
 .edge-neighbor-id {
   font-size: 11px;
@@ -216,19 +223,17 @@ header .node-count { color: var(--dim); font-size: 12px; margin-left: auto; }
 <header>
   <span class="logo">zygomorphic</span>
   <button class="nav-btn" id="btn-back" onclick="navigateBack()" disabled>&larr;</button>
+  <span class="status-dot" id="status-dot" title="up to date"></span>
+  <button class="nav-btn" id="btn-refresh" onclick="doRefresh()">refresh</button>
   <span class="status" id="hdr-status">connecting…</span>
   <span class="node-count" id="hdr-count"></span>
 </header>
 
-<div class="carousel-viewport" id="viewport">
-  <div class="empty-state" id="empty-state">no graph loaded</div>
-  <div class="carousel-track" id="track">
-    <div class="carousel-panel" id="panel-prev"></div>
-    <div class="carousel-panel" id="panel-focal"></div>
-    <div class="carousel-panel" id="panel-edges"></div>
-    <div class="carousel-panel" id="panel-next"></div>
-  </div>
+<div class="panes" id="panes" style="display:none">
+  <div class="pane" id="pane-focal"></div>
+  <div class="pane" id="pane-edges"></div>
 </div>
+<div class="empty-state" id="empty-state">no graph loaded</div>
 
 <script>
 // ---------------------------------------------------------------------------
@@ -237,7 +242,34 @@ header .node-count { color: var(--dim); font-size: 12px; margin-left: auto; }
 
 let state = null;
 let focusId = null;
-let animating = false;
+
+// ---------------------------------------------------------------------------
+// Edge label colors
+// ---------------------------------------------------------------------------
+
+const LABEL_COLORS = [
+  '#d2a8ff', // purple
+  '#79c0ff', // cyan
+  '#56d364', // green
+  '#e3b341', // yellow
+  '#f85149', // red
+  '#58a6ff', // blue
+  '#ff7b72', // coral
+  '#a5d6ff', // light blue
+  '#7ee787', // light green
+  '#ffa657', // orange
+];
+
+const labelColorMap = {};
+let nextColorIdx = 0;
+
+function labelColor(label) {
+  if (!labelColorMap[label]) {
+    labelColorMap[label] = LABEL_COLORS[nextColorIdx % LABEL_COLORS.length];
+    nextColorIdx++;
+  }
+  return labelColorMap[label];
+}
 
 // ---------------------------------------------------------------------------
 // SSE connection
@@ -276,75 +308,18 @@ function sendAction(action) {
 }
 
 function navigateTo(id) {
-  if (animating || id === focusId) return;
-  animating = true;
-
-  const track = document.getElementById('track');
-  const nextPanel = document.getElementById('panel-next');
-
-  // Pre-render new focal + edges into the next panel pair
-  nextPanel.innerHTML = renderFocalContent(state.graph, id);
-
-  // Slide left
-  track.classList.remove('no-transition');
-  track.style.transform = 'translateX(-50%)';
-
-  track.addEventListener('transitionend', function handler() {
-    track.removeEventListener('transitionend', handler);
-
-    // Update state
-    focusId = id;
-    sendAction({ type: 'navigate', nodeId: id });
-
-    // Snap back and re-render in place
-    track.classList.add('no-transition');
-    track.style.transform = 'translateX(0)';
-    render();
-
-    // Re-enable transitions after a frame
-    requestAnimationFrame(() => {
-      track.classList.remove('no-transition');
-      animating = false;
-    });
-  });
+  if (id === focusId) return;
+  focusId = id;
+  sendAction({ type: 'navigate', nodeId: id });
+  render();
 }
 
 function navigateBack() {
-  if (animating) return;
   if (!state || !state.navigationHistory || state.navigationHistory.length <= 1) return;
-
-  animating = true;
   const prevId = state.navigationHistory[state.navigationHistory.length - 2];
-  const track = document.getElementById('track');
-  const prevPanel = document.getElementById('panel-prev');
-
-  // Pre-render previous focal into the prev panel
-  prevPanel.innerHTML = renderFocalContent(state.graph, prevId);
-
-  // Start shifted left, then animate to 0
-  track.classList.add('no-transition');
-  track.style.transform = 'translateX(-50%)';
-
-  requestAnimationFrame(() => {
-    track.classList.remove('no-transition');
-    track.style.transform = 'translateX(0)';
-  });
-
-  track.addEventListener('transitionend', function handler() {
-    track.removeEventListener('transitionend', handler);
-
-    focusId = prevId;
-    sendAction({ type: 'navigate_back' });
-
-    track.classList.add('no-transition');
-    track.style.transform = 'translateX(0)';
-    render();
-
-    requestAnimationFrame(() => {
-      track.classList.remove('no-transition');
-      animating = false;
-    });
-  });
+  focusId = prevId;
+  sendAction({ type: 'navigate_back' });
+  render();
 }
 
 function submitComment() {
@@ -382,44 +357,41 @@ function renderFocalContent(graph, nodeId) {
   }
 
   const node = graph.nodes[nodeId];
-  const edges = getEdgesForNode(graph, nodeId);
 
-  // Build focal pane
-  let focalHtml = '<div class="focal-pane">';
-  focalHtml += '<div class="focal-id">' + esc(nodeId) + '</div>';
-  focalHtml += '<div class="focal-summary">' + esc(node.summary) + '</div>';
-  focalHtml += '<div class="focal-content">' + esc(node.content) + '</div>';
+  let html = '<div class="focal-pane">';
+  html += '<div class="focal-id">' + esc(nodeId) + '</div>';
+  html += '<div class="focal-summary">' + esc(node.summary) + '</div>';
+  html += '<div class="focal-content">' + esc(node.content) + '</div>';
 
   // Exploration
   if (node.exploration && node.exploration.length > 0) {
-    focalHtml += '<div class="exploration-section"><h4>Exploration</h4>';
+    html += '<div class="exploration-section"><h4>Exploration</h4>';
     node.exploration.forEach(e => {
       const t = new Date(e.timestamp).toLocaleString();
       const c = e.conclusion ? ' — ' + esc(e.conclusion) : '';
-      focalHtml += '<div class="exploration-entry">' + esc(e.agent) + ' @ ' + t + c + '</div>';
+      html += '<div class="exploration-entry">' + esc(e.agent) + ' @ ' + t + c + '</div>';
     });
-    focalHtml += '</div>';
+    html += '</div>';
   }
 
   // Comments
-  focalHtml += '<div class="comments-section"><h4>Comments</h4>';
+  html += '<div class="comments-section"><h4>Comments</h4>';
   if (state && state.focalComments && state.focalComments.length > 0 && nodeId === focusId) {
     state.focalComments.forEach(c => {
       const expiring = c.expires_at ? ' <span class="expiring">expires ' + new Date(c.expires_at).toLocaleString() + '</span>' : '';
-      focalHtml += '<div class="comment-item">';
-      focalHtml += '<div class="comment-meta">' + esc(c.author) + ' · ' + new Date(c.created_at).toLocaleString() + expiring + '</div>';
-      focalHtml += '<div class="comment-body">' + esc(c.content) + '</div>';
-      focalHtml += '</div>';
+      html += '<div class="comment-item">';
+      html += '<div class="comment-meta">' + esc(c.author) + ' · ' + new Date(c.created_at).toLocaleString() + expiring + '</div>';
+      html += '<div class="comment-body">' + esc(c.content) + '</div>';
+      html += '</div>';
     });
   }
-  focalHtml += '<div class="comment-input">';
-  focalHtml += '<input type="text" id="comment-input" placeholder="Add a comment…" onkeydown="if(event.key===\'Enter\')submitComment()">';
-  focalHtml += '<button onclick="submitComment()">post</button>';
-  focalHtml += '</div></div>';
+  html += '<div class="comment-input">';
+  html += '<input type="text" id="comment-input" placeholder="Add a comment…" onkeydown="if(event.key===\'Enter\')submitComment()">';
+  html += '<button onclick="submitComment()">post</button>';
+  html += '</div></div>';
 
-  focalHtml += '</div>';
-
-  return focalHtml;
+  html += '</div>';
+  return html;
 }
 
 function renderEdgesContent(graph, nodeId) {
@@ -439,11 +411,12 @@ function renderEdgesContent(graph, nodeId) {
     });
 
     Object.keys(byLabel).sort().forEach(label => {
+      const color = labelColor(label);
       byLabel[label].forEach(e => {
         const neighborId = otherEnd(e, nodeId);
         const neighbor = graph.nodes[neighborId];
         html += '<div class="edge-item" onclick="navigateTo(\'' + esc(neighborId) + '\')">';
-        html += '<div class="edge-label">' + esc(label) + '</div>';
+        html += '<div class="edge-label" style="color:' + color + '">' + esc(label) + '</div>';
         html += '<div class="edge-neighbor-id">' + esc(neighborId) + '</div>';
         html += '<div class="edge-neighbor-summary">' + esc(neighbor ? neighbor.summary : '(missing)') + '</div>';
         html += '</div>';
@@ -460,19 +433,19 @@ function render() {
 
   const graph = state.graph;
   const empty = document.getElementById('empty-state');
-  const track = document.getElementById('track');
+  const panes = document.getElementById('panes');
   const count = document.getElementById('hdr-count');
   const backBtn = document.getElementById('btn-back');
 
   if (!graph || !graph.nodes || Object.keys(graph.nodes).length === 0) {
     empty.style.display = 'flex';
-    track.style.display = 'none';
+    panes.style.display = 'none';
     count.textContent = '';
     return;
   }
 
   empty.style.display = 'none';
-  track.style.display = 'flex';
+  panes.style.display = 'flex';
 
   const nodeCount = Object.keys(graph.nodes).length;
   const edgeCount = Object.keys(graph.edges || {}).length;
@@ -486,12 +459,11 @@ function render() {
   // Back button
   backBtn.disabled = !state.navigationHistory || state.navigationHistory.length <= 1;
 
-  // Render focal + edges into the visible panels
-  const focalPanel = document.getElementById('panel-focal');
-  const edgesPanel = document.getElementById('panel-edges');
+  // Render
+  document.getElementById('pane-focal').innerHTML = renderFocalContent(graph, focusId);
+  document.getElementById('pane-edges').innerHTML = renderEdgesContent(graph, focusId);
 
-  focalPanel.innerHTML = renderFocalContent(graph, focusId);
-  edgesPanel.innerHTML = renderEdgesContent(graph, focusId);
+  syncKnown();
 }
 
 function esc(s) {
@@ -502,10 +474,83 @@ function esc(s) {
 }
 
 // ---------------------------------------------------------------------------
+// Polling for external changes
+// ---------------------------------------------------------------------------
+
+let known = { nodeCount: 0, edgeCount: 0, nodesMaxUpdated: null, focusNodeUpdated: null, focusCommentCount: 0 };
+
+function startPolling() {
+  setInterval(async () => {
+    if (!state || !state.graph) return;
+    try {
+      const res = await fetch('/poll?focusNodeId=' + encodeURIComponent(focusId || ''));
+      if (!res.ok) return;
+      const p = await res.json();
+
+      const dot = document.getElementById('status-dot');
+      const btn = document.getElementById('btn-refresh');
+
+      // Check if comments changed — auto-load
+      if (p.focusCommentCount !== known.focusCommentCount) {
+        known.focusCommentCount = p.focusCommentCount;
+        sendAction({ type: 'refresh_comments' });
+      }
+
+      // Check if focused node content changed
+      if (known.focusNodeUpdated && p.focusNodeUpdated !== known.focusNodeUpdated) {
+        dot.className = 'status-dot focus-stale';
+        dot.title = 'focused node changed externally';
+        btn.classList.add('visible');
+        return;
+      }
+
+      // Check if graph structure changed (other nodes/edges)
+      if (p.nodeCount !== known.nodeCount || p.edgeCount !== known.edgeCount ||
+          p.nodesMaxUpdated !== known.nodesMaxUpdated) {
+        dot.className = 'status-dot stale';
+        dot.title = 'graph changed externally';
+        btn.classList.add('visible');
+        return;
+      }
+
+      // Up to date
+      dot.className = 'status-dot';
+      dot.title = 'up to date';
+      btn.classList.remove('visible');
+    } catch {}
+  }, 1000);
+}
+
+function syncKnown() {
+  if (!state || !state.graph) return;
+  known.nodeCount = Object.keys(state.graph.nodes).length;
+  known.edgeCount = Object.keys(state.graph.edges || {}).length;
+  // We don't have max updated_at client-side, so fetch it once
+  fetch('/poll?focusNodeId=' + encodeURIComponent(focusId || ''))
+    .then(r => r.json())
+    .then(p => {
+      known.nodesMaxUpdated = p.nodesMaxUpdated;
+      known.focusNodeUpdated = p.focusNodeUpdated;
+      known.focusCommentCount = p.focusCommentCount;
+    })
+    .catch(() => {});
+}
+
+function doRefresh() {
+  sendAction({ type: 'refresh' });
+  const dot = document.getElementById('status-dot');
+  const btn = document.getElementById('btn-refresh');
+  dot.className = 'status-dot';
+  dot.title = 'up to date';
+  btn.classList.remove('visible');
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 
 connect();
+startPolling();
 </script>
 </body>
 </html>

@@ -29,6 +29,32 @@ export class Orchestrator extends EventEmitter {
     this.emit('state', this.getState());
   }
 
+  async reload(): Promise<void> {
+    const prevFocus = this.state.focusNodeId;
+    const prevHistory = this.state.navigationHistory;
+    const graph = await db.loadFullGraph();
+    this.state = reduce(this.state, { type: 'GRAPH_LOADED', graph });
+
+    // Restore focus if the node still exists
+    if (prevFocus && graph.nodes[prevFocus]) {
+      this.state = { ...this.state, focusNodeId: prevFocus, navigationHistory: prevHistory };
+    }
+
+    if (this.state.focusNodeId) {
+      const comments = await db.getComments(this.state.focusNodeId);
+      this.state = reduce(this.state, { type: 'COMMENTS_LOADED', comments });
+    }
+
+    this.emit('state', this.getState());
+  }
+
+  async reloadComments(): Promise<void> {
+    if (!this.state.focusNodeId) return;
+    const comments = await db.getComments(this.state.focusNodeId);
+    this.state = reduce(this.state, { type: 'COMMENTS_LOADED', comments });
+    this.emit('state', this.getState());
+  }
+
   getState(): WebState {
     const { screen, loading, error, graph, focusNodeId, focalComments, navigationHistory } = this.state;
     return {
