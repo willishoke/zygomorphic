@@ -55,6 +55,16 @@ export class Orchestrator extends EventEmitter {
     this.emit('state', this.getState());
   }
 
+  async deleteComment(id: string): Promise<void> {
+    await db.softDeleteComment(id);
+    await this.reloadComments();
+  }
+
+  async voteComment(id: string, author: string, vote: 1 | -1): Promise<void> {
+    await db.upsertVote(id, author, vote);
+    await this.reloadComments();
+  }
+
   getState(): WebState {
     const { screen, loading, error, graph, focusNodeId, focalComments, navigationHistory } = this.state;
     return {

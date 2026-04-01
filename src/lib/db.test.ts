@@ -84,7 +84,7 @@ describe('cascade delete', () => {
     await insertEdge(makeEdge('e2', 'n1', 'n3', 'linked'));
     await insertComment({
       id: 'c_cascade', node_id: 'n3', content: 'note',
-      author: 'human', created_at: now, expires_at: null,
+      author: 'human', created_at: now, expires_at: null, score: 0, deleted_at: null,
     });
 
     await deleteNode('n3');
@@ -102,7 +102,7 @@ describe('comments', () => {
   it('inserts and retrieves comments', async () => {
     const comment: Comment = {
       id: 'c1', node_id: 'n1', content: 'interesting',
-      author: 'human', created_at: now, expires_at: null,
+      author: 'human', created_at: now, expires_at: null, score: 0, deleted_at: null,
     };
     await insertComment(comment);
     const got = await getComments('n1');
@@ -114,7 +114,7 @@ describe('comments', () => {
     const expired: Comment = {
       id: 'c2', node_id: 'n1', content: 'old',
       author: 'agent', created_at: now,
-      expires_at: new Date(Date.now() - 60_000).toISOString(),
+      expires_at: new Date(Date.now() - 60_000).toISOString(), score: 0, deleted_at: null,
     };
     await insertComment(expired);
 

@@ -16,9 +16,13 @@ import type { AppEvent } from './state.js';
 
 let _graph: GraphData | null = null;
 let _dispatch: ((event: AppEvent) => void | Promise<void>) | null = null;
+let _deleteComment: ((id: string) => Promise<void>) | null = null;
+let _voteComment: ((id: string, author: string, vote: 1 | -1) => Promise<void>) | null = null;
 
 export function setGraph(graph: GraphData | null): void { _graph = graph; }
 export function setDispatch(fn: (event: AppEvent) => void | Promise<void>): void { _dispatch = fn; }
+export function setDeleteComment(fn: (id: string) => Promise<void>): void { _deleteComment = fn; }
+export function setVoteComment(fn: (id: string, author: string, vote: 1 | -1) => Promise<void>): void { _voteComment = fn; }
 
 function graph(): GraphData {
   if (!_graph) throw new Error('No graph loaded');
@@ -343,9 +347,40 @@ export function createMcpServer(): McpServer {
           author,
           created_at: now.toISOString(),
           expires_at: expiresAt,
+          score: 0,
+          deleted_at: null,
         },
       });
       return { content: [{ type: 'text', text: `Comment added on ${node_id}` }] };
+    },
+  );
+
+  // ---- delete_comment -------------------------------------------------------
+  server.tool(
+    'delete_comment',
+    'Delete a comment by ID',
+    { id: z.string().describe('Comment ID') },
+    async ({ id }) => {
+      if (!_deleteComment) throw new Error('No deleteComment function set');
+      await _deleteComment(id);
+      return { content: [{ type: 'text', text: `Deleted comment ${id}` }] };
+    },
+  );
+
+  // ---- vote_comment ---------------------------------------------------------
+  server.tool(
+    'vote_comment',
+    'Upvote or downvote a comment',
+    {
+      id: z.string().describe('Comment ID'),
+      vote: z.enum(['up', 'down']).describe('Vote direction'),
+      author: z.string().describe('Voter identifier (agent name or "human")'),
+    },
+    async ({ id, vote, author }) => {
+      if (!_voteComment) throw new Error('No voteComment function set');
+      const v = vote === 'up' ? 1 : -1;
+      await _voteComment(id, author, v as 1 | -1);
+      return { content: [{ type: 'text', text: `Voted ${vote} on comment ${id}` }] };
     },
   );
 
@@ -409,9 +444,13 @@ export function createMcpServer(): McpServer {
 export async function startStdioServer(
   graph: GraphData,
   dispatchFn: (event: AppEvent) => void | Promise<void>,
+  deleteCommentFn?: (id: string) => Promise<void>,
+  voteCommentFn?: (id: string, author: string, vote: 1 | -1) => Promise<void>,
 ): Promise<void> {
   setGraph(graph);
   setDispatch(dispatchFn);
+  if (deleteCommentFn) setDeleteComment(deleteCommentFn);
+  if (voteCommentFn) setVoteComment(voteCommentFn);
   const server = createMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
