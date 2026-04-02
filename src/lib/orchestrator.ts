@@ -55,6 +55,31 @@ export class Orchestrator extends EventEmitter {
     this.emit('state', this.getState());
   }
 
+  async deleteComment(id: string, requestingAuthor: string): Promise<void> {
+    const owner = await db.getCommentAuthor(id);
+    if (owner === null) throw new Error(`Comment '${id}' not found`);
+    if (requestingAuthor !== 'human' && owner !== requestingAuthor) {
+      throw new Error(`Author '${requestingAuthor}' cannot delete a comment by '${owner}'`);
+    }
+    await db.softDeleteComment(id);
+    await this.reloadComments();
+  }
+
+  async editComment(id: string, requestingAuthor: string, content: string): Promise<void> {
+    const owner = await db.getCommentAuthor(id);
+    if (owner === null) throw new Error(`Comment '${id}' not found`);
+    if (requestingAuthor !== 'human' && owner !== requestingAuthor) {
+      throw new Error(`Author '${requestingAuthor}' cannot edit a comment by '${owner}'`);
+    }
+    await db.editComment(id, content);
+    await this.reloadComments();
+  }
+
+  async voteComment(id: string, author: string, vote: 1 | -1): Promise<void> {
+    await db.upsertVote(id, author, vote);
+    await this.reloadComments();
+  }
+
   getState(): WebState {
     const { screen, loading, error, graph, focusNodeId, focalComments, navigationHistory } = this.state;
     return {

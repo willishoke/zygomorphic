@@ -1,12 +1,15 @@
 import { app, BrowserWindow } from 'electron';
 import { Orchestrator } from '../src/lib/orchestrator.js';
+
+app.setName('Zygomorphic');
 import { createWebServer } from '../src/lib/webserver.js';
-import { initSchema, loadFullGraph, deleteExpiredComments, closePool } from '../src/lib/db.js';
+import { initSchema, loadFullGraph, deleteExpiredComments, closePool, startListening } from '../src/lib/db.js';
 import type { Server } from 'http';
 
 let win: BrowserWindow | null = null;
 let server: Server | null = null;
 let expiryTimer: ReturnType<typeof setInterval> | null = null;
+let stopListening: (() => Promise<void>) | null = null;
 
 app.whenReady().then(async () => {
   await initSchema();
@@ -18,6 +21,11 @@ app.whenReady().then(async () => {
   }
 
   server = createWebServer(0, orch);
+
+  stopListening = startListening(
+    () => orch.reload().catch(() => {}),
+    () => orch.reloadComments().catch(() => {}),
+  );
 
   // Expire old comments every 5 minutes
   expiryTimer = setInterval(() => deleteExpiredComments().catch(() => {}), 5 * 60_000);
@@ -40,9 +48,10 @@ app.whenReady().then(async () => {
   win.on('closed', () => { win = null; });
 });
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
   if (expiryTimer) clearInterval(expiryTimer);
+  if (stopListening) await stopListening();
   server?.close();
-  closePool().catch(() => {});
+  await closePool().catch(() => {});
   app.quit();
 });

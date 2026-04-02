@@ -29,7 +29,27 @@ export interface Comment {
   content: string;
   author: string;
   created_at: string;
+  updated_at: string | null;
   expires_at: string | null;
+  score: number;
+  deleted_at: string | null;
+}
+
+// ---- Activity feed ---------------------------------------------------------
+
+export type ActivityItem =
+  | { kind: 'node'; id: string; summary: string; degree: number; updated_at: string }
+  | { kind: 'comment'; id: string; node_id: string; node_summary: string; content: string; author: string; score: number; created_at: string };
+
+// ---- Stats -----------------------------------------------------------------
+
+export interface StatsData {
+  nodeCount: number;
+  edgeCount: number;
+  commentCount: number;
+  topConnected: Array<{ id: string; summary: string; degree: number }>;
+  topCommented: Array<{ id: string; summary: string; commentCount: number }>;
+  labelDistribution: Array<{ label: string; count: number }>;
 }
 
 export interface GraphData {

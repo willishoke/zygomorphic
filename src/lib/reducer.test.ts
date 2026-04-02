@@ -159,7 +159,7 @@ describe('COMMENTS_LOADED', () => {
   it('replaces focal comments', () => {
     const s0 = loadedState();
     const comments: Comment[] = [
-      { id: 'c1', node_id: 'root', content: 'hi', author: 'human', created_at: now, expires_at: null },
+      { id: 'c1', node_id: 'root', content: 'hi', author: 'human', created_at: now, expires_at: null, score: 0, updated_at: null, deleted_at: null },
     ];
     const s1 = reduce(s0, { type: 'COMMENTS_LOADED', comments });
     expect(s1.focalComments).toEqual(comments);
@@ -169,11 +169,11 @@ describe('COMMENTS_LOADED', () => {
 describe('COMMENT_ADDED', () => {
   it('appends a comment', () => {
     const s0 = loadedState();
-    const c1: Comment = { id: 'c1', node_id: 'root', content: 'first', author: 'human', created_at: now, expires_at: null };
+    const c1: Comment = { id: 'c1', node_id: 'root', content: 'first', author: 'human', created_at: now, expires_at: null, score: 0, updated_at: null, deleted_at: null };
     const s1 = reduce(s0, { type: 'COMMENT_ADDED', comment: c1 });
     expect(s1.focalComments).toHaveLength(1);
 
-    const c2: Comment = { id: 'c2', node_id: 'root', content: 'second', author: 'agent', created_at: now, expires_at: null };
+    const c2: Comment = { id: 'c2', node_id: 'root', content: 'second', author: 'agent', created_at: now, expires_at: null, score: 0, updated_at: null, deleted_at: null };
     const s2 = reduce(s1, { type: 'COMMENT_ADDED', comment: c2 });
     expect(s2.focalComments).toHaveLength(2);
   });

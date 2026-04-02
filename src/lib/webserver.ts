@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import type { Orchestrator } from './orchestrator.js';
 import * as db from './db.js';
+import type { ActivityItem, StatsData } from './types.js';
 
 const HTML_PATH = path.join(process.cwd(), 'src/web/index.html');
 
@@ -47,15 +48,26 @@ export function createWebServer(port = 7777, orch?: Orchestrator): http.Server {
       return;
     }
 
-    if (req.url?.startsWith('/poll')) {
+    if (req.url?.startsWith('/activity')) {
       const params = new URL(req.url, 'http://localhost').searchParams;
-      const focusNodeId = params.get('focusNodeId');
-      db.poll(focusNodeId).then((result) => {
+      const sort = params.get('sort') === 'score' ? 'score' : 'recent';
+      db.getActivityFeed(sort).then((items: ActivityItem[]) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
+        res.end(JSON.stringify(items));
       }).catch(() => {
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'poll failed' }));
+        res.end(JSON.stringify({ error: 'activity fetch failed' }));
+      });
+      return;
+    }
+
+    if (req.url === '/stats') {
+      db.getStats().then((stats: StatsData) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(stats));
+      }).catch(() => {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'stats fetch failed' }));
       });
       return;
     }
@@ -121,6 +133,30 @@ async function handleAction(orch: Orchestrator, action: Record<string, unknown>)
     case 'refresh_comments':
       await orch.reloadComments();
       break;
+    case 'delete_comment':
+      if (typeof action.comment_id === 'string') {
+        const delAuthor = typeof action.author === 'string' ? action.author : 'human';
+        await orch.deleteComment(action.comment_id, delAuthor);
+      }
+      break;
+    case 'edit_comment':
+      if (
+        typeof action.comment_id === 'string'
+        && typeof action.content === 'string'
+      ) {
+        const editAuthor = typeof action.author === 'string' ? action.author : 'human';
+        await orch.editComment(action.comment_id, editAuthor, action.content);
+      }
+      break;
+    case 'vote_comment':
+      if (
+        typeof action.comment_id === 'string'
+        && typeof action.author === 'string'
+        && (action.vote === 1 || action.vote === -1)
+      ) {
+        await orch.voteComment(action.comment_id, action.author, action.vote as 1 | -1);
+      }
+      break;
     case 'add_comment':
       if (
         typeof action.node_id === 'string'
@@ -139,7 +175,10 @@ async function handleAction(orch: Orchestrator, action: Record<string, unknown>)
             content: action.content,
             author: action.author,
             created_at: now.toISOString(),
+            updated_at: null,
             expires_at: expiresIn,
+            score: 0,
+            deleted_at: null,
           },
         });
       }
