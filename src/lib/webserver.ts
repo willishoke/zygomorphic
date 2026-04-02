@@ -72,19 +72,6 @@ export function createWebServer(port = 7777, orch?: Orchestrator): http.Server {
       return;
     }
 
-    if (req.url?.startsWith('/poll')) {
-      const params = new URL(req.url, 'http://localhost').searchParams;
-      const focusNodeId = params.get('focusNodeId');
-      db.poll(focusNodeId).then((result) => {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
-      }).catch(() => {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'poll failed' }));
-      });
-      return;
-    }
-
     if (req.method === 'POST' && req.url === '/action') {
       if (!orch) {
         res.writeHead(503, { 'Content-Type': 'application/json' });

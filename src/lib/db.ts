@@ -4,16 +4,17 @@
 import pg from 'pg';
 import type { NodeData, Edge, Comment, GraphData, ActivityItem, StatsData } from './types.js';
 
-const { Pool } = pg;
+const { Pool, Client } = pg;
+
+function connString(): string {
+  return process.env.ZYGOMORPHIC_DB_URL ?? 'postgresql://rhizome@localhost/zygomorphic';
+}
 
 let pool: pg.Pool | null = null;
 
 export function getPool(): pg.Pool {
   if (!pool) {
-    pool = new Pool({
-      connectionString: process.env.ZYGOMORPHIC_DB_URL
-        ?? 'postgresql://rhizome@localhost/zygomorphic',
-    });
+    pool = new Pool({ connectionString: connString() });
   }
   return pool;
 }
@@ -75,6 +76,37 @@ export async function initSchema(): Promise<void> {
     -- Migrate existing comments table if columns are missing
     ALTER TABLE comments ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
     ALTER TABLE comments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+
+    -- NOTIFY triggers for LISTEN/NOTIFY change detection
+    CREATE OR REPLACE FUNCTION zygomorphic_notify_graph()
+    RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN PERFORM pg_notify('zygomorphic_changes', 'graph'); RETURN NULL; END;
+    $$;
+
+    CREATE OR REPLACE FUNCTION zygomorphic_notify_comments()
+    RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN PERFORM pg_notify('zygomorphic_changes', 'comments'); RETURN NULL; END;
+    $$;
+
+    DROP TRIGGER IF EXISTS trg_nodes_notify ON nodes;
+    CREATE TRIGGER trg_nodes_notify
+      AFTER INSERT OR UPDATE OR DELETE ON nodes
+      FOR EACH STATEMENT EXECUTE FUNCTION zygomorphic_notify_graph();
+
+    DROP TRIGGER IF EXISTS trg_edges_notify ON edges;
+    CREATE TRIGGER trg_edges_notify
+      AFTER INSERT OR UPDATE OR DELETE ON edges
+      FOR EACH STATEMENT EXECUTE FUNCTION zygomorphic_notify_graph();
+
+    DROP TRIGGER IF EXISTS trg_comments_notify ON comments;
+    CREATE TRIGGER trg_comments_notify
+      AFTER INSERT OR UPDATE OR DELETE ON comments
+      FOR EACH STATEMENT EXECUTE FUNCTION zygomorphic_notify_comments();
+
+    DROP TRIGGER IF EXISTS trg_votes_notify ON comment_votes;
+    CREATE TRIGGER trg_votes_notify
+      AFTER INSERT OR UPDATE OR DELETE ON comment_votes
+      FOR EACH STATEMENT EXECUTE FUNCTION zygomorphic_notify_comments();
   `);
 }
 
@@ -266,35 +298,54 @@ export async function searchNodes(query: string): Promise<NodeData[]> {
   }));
 }
 
-// ---- Poll ------------------------------------------------------------------
+// ---- Listen/Notify ---------------------------------------------------------
 
-export interface PollResult {
-  nodeCount: number;
-  edgeCount: number;
-  nodesMaxUpdated: string | null;
-  focusNodeUpdated: string | null;
-  focusCommentCount: number;
-}
+export function startListening(
+  onGraphChange: () => void,
+  onCommentChange: () => void,
+): () => Promise<void> {
+  let client: pg.Client | null = null;
+  let stopped = false;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let graphDebounce: ReturnType<typeof setTimeout> | null = null;
+  let commentDebounce: ReturnType<typeof setTimeout> | null = null;
 
-export async function poll(focusNodeId: string | null): Promise<PollResult> {
-  const db = getPool();
-  const { rows } = await db.query(`
-    SELECT
-      (SELECT COUNT(*)::int FROM nodes) AS node_count,
-      (SELECT COUNT(*)::int FROM edges) AS edge_count,
-      (SELECT MAX(updated_at) FROM nodes) AS nodes_max_updated,
-      (SELECT updated_at FROM nodes WHERE id = $1) AS focus_node_updated,
-      (SELECT COUNT(*)::int FROM comments
-       WHERE node_id = $1 AND deleted_at IS NULL
-         AND (expires_at IS NULL OR expires_at > now())) AS focus_comment_count
-  `, [focusNodeId]);
-  const r = rows[0];
-  return {
-    nodeCount: r.node_count,
-    edgeCount: r.edge_count,
-    nodesMaxUpdated: r.nodes_max_updated ? r.nodes_max_updated.toISOString() : null,
-    focusNodeUpdated: r.focus_node_updated ? r.focus_node_updated.toISOString() : null,
-    focusCommentCount: r.focus_comment_count,
+  function scheduleGraph() {
+    if (graphDebounce) clearTimeout(graphDebounce);
+    graphDebounce = setTimeout(() => { graphDebounce = null; onGraphChange(); }, 200);
+  }
+
+  function scheduleComment() {
+    if (commentDebounce) clearTimeout(commentDebounce);
+    commentDebounce = setTimeout(() => { commentDebounce = null; onCommentChange(); }, 200);
+  }
+
+  async function connect() {
+    if (stopped) return;
+    client = new Client({ connectionString: connString() });
+    client.on('notification', (msg) => {
+      if (msg.payload === 'graph') scheduleGraph();
+      else if (msg.payload === 'comments') scheduleComment();
+    });
+    client.on('error', () => {});
+    try {
+      await client.connect();
+      await client.query('LISTEN zygomorphic_changes');
+    } catch {
+      await client.end().catch(() => {});
+      client = null;
+      if (!stopped) reconnectTimer = setTimeout(connect, 3000);
+    }
+  }
+
+  connect();
+
+  return async () => {
+    stopped = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (graphDebounce) clearTimeout(graphDebounce);
+    if (commentDebounce) clearTimeout(commentDebounce);
+    if (client) { try { await client.end(); } catch { /* ignore */ } client = null; }
   };
 }
 
