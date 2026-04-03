@@ -1,6 +1,25 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Orchestrator } from './orchestrator.js';
+import { getPool, initSchema, closePool } from './db.js';
 import type { GraphData } from './types.js';
+
+const TEST_SCHEMA = 'test_orch_' + process.pid;
+
+beforeAll(async () => {
+  const db = getPool();
+  await db.query(`CREATE SCHEMA IF NOT EXISTS ${TEST_SCHEMA}`);
+  await db.query(`SET search_path TO ${TEST_SCHEMA}`);
+  db.on('connect', (client: import('pg').PoolClient) => {
+    client.query(`SET search_path TO ${TEST_SCHEMA}`);
+  });
+  await initSchema();
+});
+
+afterAll(async () => {
+  const db = getPool();
+  await db.query(`DROP SCHEMA ${TEST_SCHEMA} CASCADE`);
+  await closePool();
+});
 
 const now = new Date().toISOString();
 
