@@ -45,6 +45,7 @@ jobs:
     needs: check
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
