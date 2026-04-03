@@ -8,6 +8,7 @@
     "start": "npm run build && electron .",
     "make-icon": "node scripts/make-icon.mjs",
     "package": "npm run build && electron-builder",
+    "build:server": "tsc -p tsconfig.server.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
