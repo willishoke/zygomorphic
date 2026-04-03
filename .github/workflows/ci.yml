@@ -40,3 +40,22 @@ jobs:
 
       - name: Tests
         run: npm test
+
+  deploy:
+    needs: check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /home/deploy/zygomorphic
+            git pull
+            npm ci --omit=dev
+            npm run build:server
+            sudo systemctl restart zygomorphic
