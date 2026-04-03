@@ -35,7 +35,8 @@ async function makeClient(): Promise<Client> {
 }
 
 function text(result: Awaited<ReturnType<Client['callTool']>>): string {
-  const block = result.content[0];
+  const content = result.content as Array<{ type: string; text: string }>;
+  const block = content[0];
   if (!block || block.type !== 'text') throw new Error('Expected text content');
   return block.text;
 }
