@@ -18,3 +18,5 @@ export { id2, factor, fuse, vertical, horizontal, rewriteSource, rewriteTarget, 
 export type { CellOps } from './cell-ops.js';
 export { checkCompose, cellBoundary, isIdentity, CellTypeError } from './cell-ops.js';
 export { termOps, rewriteOps } from './cell-ops-instances.js';
+export type { Artifact as SignalArtifact, SumValue, BodyExecutor as SignalBodyExecutor, ExecutionOptions } from './signal-executor.js';
+export { signalExecute, isSumValue, ExecutionError } from './signal-executor.js';
