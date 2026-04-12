@@ -1,0 +1,920 @@
+{
+  "nodes": {
+    "carousel-ui": {
+      "id": "carousel-ui",
+      "content": "Two-pane carousel: focal node on the left (content, exploration, comments), edge list on the right. Click an edge and the view slides over. Navigation history enables a back button. Vanilla JS, no framework.",
+      "summary": "Two-pane carousel web UI",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "zygo": {
+      "id": "zygo",
+      "content": "Zygomorphic is a persistent graph memory for AI agents and humans. Agents explore, annotate, and build structure in a shared knowledge graph backed by PostgreSQL. Humans see every change in real time through a two-pane carousel UI. The name comes from bilateral symmetry in biology — two complementary halves working together.",
+      "summary": "Zygomorphic — the project itself",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "graph-model": {
+      "id": "graph-model",
+      "content": "The core data model is an undirected labeled graph. Nodes have content, summaries, and exploration logs. Edges are labeled and bidirectional — contains, depends_on, related, contradicts, whatever fits. No hierarchy, no root, no depth limit. Cycles are fine. Structure emerges from use rather than being imposed upfront.",
+      "summary": "Undirected labeled graph model",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "postgres": {
+      "id": "postgres",
+      "content": "PostgreSQL handles all persistence. Three tables: nodes, edges, comments. CASCADE deletes maintain referential integrity. Neighborhood queries use JOINs. The schema is initialized on startup via initSchema(). Connection string comes from ZYGOMORPHIC_DB_URL env var.",
+      "summary": "PostgreSQL persistence layer",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "mcp-server": {
+      "id": "mcp-server",
+      "content": "The MCP server exposes 12 tools for agent interaction: get_overview, get_node, get_neighborhood, search, create_node, update_node, create_edge, delete_edge, add_comment, record_exploration, get_exploration_state. Read tools query Postgres directly. Write tools dispatch through the orchestrator. Standard stdio transport.",
+      "summary": "MCP server — 12 tools for agents",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "orchestrator": {
+      "id": "orchestrator",
+      "content": "The orchestrator owns the state machine. dispatch() is async: it runs the pure reducer, persists to Postgres, loads comments on focus change, and pushes state to all SSE clients. The reducer is a pure function — all side effects happen in the orchestrator layer.",
+      "summary": "Async orchestrator with pure reducer",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "threading": {
+      "id": "threading",
+      "content": "Comments gain a parent_comment_id field, turning flat annotation into threaded discussion. Agents and humans can reply to each other's comments directly. Threading preserves conversational context on the nodes where it matters most.",
+      "summary": "Roadmap: comment threading",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "comment-task": {
+      "id": "comment-task",
+      "content": "Comments become actionable via an addressee field and @mention syntax. \"@researcher find contradicting evidence\" is both a comment and a task. The addressee field creates a clear ownership model — every task has exactly one responsible agent or human.",
+      "summary": "Roadmap: comment-as-task with @mentions",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "agent-reactor": {
+      "id": "agent-reactor",
+      "content": "A polling loop that watches for unresolved @mentions and invokes the appropriate agent. The graph becomes self-organizing: humans leave instructions, agents execute, results flow back as nodes and comments. No manual orchestration.",
+      "summary": "Roadmap: agent reactor",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "private-subgraphs": {
+      "id": "private-subgraphs",
+      "content": "Nodes gain visibility and owner fields. Agents can maintain private working state that doesn't pollute the shared graph until ready. Teams partition a single graph into public and private regions. Essential for multi-tenant deployment.",
+      "summary": "Roadmap: private subgraphs",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "version-control": {
+      "id": "version-control",
+      "content": "Graph data lives in Postgres, outside of git. The schema is version-controlled in db.ts but rows are not. Open question: should we build export/import tooling? pg_dump snapshots? Event sourcing with a log table?",
+      "summary": "Open question: graph data versioning",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "label-similarity": {
+      "id": "label-similarity",
+      "content": "Edge labels are freeform strings. To prevent drift (depends_on vs dependency vs depends-on), agents should be able to query existing labels by semantic similarity before creating new ones. Start with exposing the full label list + Levenshtein distance; move to embeddings if the vocabulary grows large.",
+      "summary": "Roadmap: edge label similarity search",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:04:14.308Z"
+    },
+    "comments": {
+      "id": "comments",
+      "content": "Ephemeral comments on nodes. Each comment has an author, content, created_at, and optional expires_at. Expired comments are cleaned up every 5 minutes. Both humans (via UI) and agents (via MCP) can leave comments. Comments are the primary human-agent communication channel — the place where intent, feedback, and context are exchanged directly on the nodes they concern. This is also the extension point for the entire roadmap: threading adds conversational depth, the task system adds actionability via @mentions, and the reactor closes the loop by invoking agents automatically.",
+      "summary": "Ephemeral comment system",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:06:51.117Z"
+    },
+    "web-deploy": {
+      "id": "web-deploy",
+      "content": "The HTTP server already works standalone — Electron is optional packaging. Deploying to the web means: a hosted Postgres instance, the Node.js server behind a reverse proxy, and the vanilla HTML/JS UI served statically. SSE works through any proxy that supports streaming.\n\nThe deployment path is straightforward because the architecture was designed for it from the start. There is no client-side framework to hydrate, no WebSocket upgrade to negotiate, no local-first sync protocol to bridge. The server owns the state, Postgres owns the data, and SSE is the push channel. Moving from localhost to a cloud VM is a configuration change, not a rewrite.\n\nMulti-user follows naturally: each SSE client already receives the full state on every mutation. Adding authentication is a middleware concern — the orchestrator and reducer are user-agnostic. The real work is in the UI: showing who is looking at what, and making concurrent edits visible without conflicts. CRDTs are overkill here since Postgres serializes writes; the question is how to surface remote changes without disrupting the local user's focus. The poll/refresh mechanism is the first step toward that.",
+      "summary": "Web deployment path",
+      "exploration": [],
+      "created_at": "2026-04-01T07:04:14.308Z",
+      "updated_at": "2026-04-01T07:08:04.009Z"
+    },
+    "zygomorphic_1775200349808_0": {
+      "id": "zygomorphic_1775200349808_0",
+      "content": "Zygomorphic is a persistent graph-based memory system where humans and LLM agents collaborate in a shared knowledge graph. Nodes hold free-form content; edges are undirected labeled relationships. Both humans (via a web UI) and agents (via MCP tools) read and write the same structure. The name reflects bilateral symmetry: one interface for humans, one for agents, both operating on the same underlying graph.",
+      "summary": "Shared knowledge graph for humans and AI agents",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "design_1775200349808_1": {
+      "id": "design_1775200349808_1",
+      "content": "Six principles shape every decision in Zygomorphic:\n1. Navigation over retrieval — agents orient themselves in the graph rather than receiving pre-selected context.\n2. Summaries as optimization — read summaries to decide relevance before loading full content; token cost scales with query breadth, not depth.\n3. Read and write — the graph is live; agents can create, update, and restructure nodes.\n4. Same structure, two interfaces — humans and agents share one graph, rendered differently.\n5. Small composable tool surface — ~12 MCP tools, no domain-specific operations.\n6. Token efficiency — high-level orientation uses summaries; deep investigation drills one branch.",
+      "summary": "Core design principles guiding the system",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "model_1775200349808_2": {
+      "id": "model_1775200349808_2",
+      "content": "GraphData is the central in-memory shape: { nodes: Record<string, NodeData>, edges: Record<string, Edge> }. It represents the full graph at a point in time. Loaded from Postgres on startup and on change notifications. Passed to the MCP server so tools can read it without extra DB queries.",
+      "summary": "GraphData: nodes and edges as the core data shape",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "node_1775200349808_3": {
+      "id": "node_1775200349808_3",
+      "content": "Each node carries: id (string), content (free-form text), summary (short compressed description), exploration (array of ExplorationEntry recording agent visits), created_at and updated_at (ISO timestamps). Summaries are written by the creator or auto-truncated from content. Exploration entries accumulate over time; they are never overwritten.",
+      "summary": "NodeData: id, content, summary, exploration, timestamps",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "edge_1775200349808_4": {
+      "id": "edge_1775200349808_4",
+      "content": "Edges are undirected: { id, a, b, label, created_at }. The label carries the semantic (e.g. \"contains\", \"depends_on\", \"contradicts\", \"see_also\"). Because edges are undirected, both nodes appear as neighbors regardless of which was listed first. Direction is inferred from label semantics, not structure. This simplifies navigation and supports multi-parent relationships naturally.",
+      "summary": "Edge: undirected labeled connection between two nodes",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "exploration_1775200349808_5": {
+      "id": "exploration_1775200349808_5",
+      "content": "ExplorationEntry: { agent: string, timestamp: number, conclusion?: string }. Stored as a JSONB array on the node row. Agents append entries via record_exploration(); entries are never deleted. get_exploration_state() returns all nodes with exploration history, grouped by agent and conclusion. This gives both humans and agents visibility into what has been investigated and what was found.",
+      "summary": "ExplorationEntry: tracks which agents visited a node and what they concluded",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "comment_1775200349808_6": {
+      "id": "comment_1775200349808_6",
+      "content": "Comments are node-scoped annotations: { id, node_id, content, author, created_at, updated_at, expires_at, deleted_at, score }. Features: optional expiry (auto-cleaned by a 5-minute timer), soft delete (deleted_at flag, row preserved), voting via comment_votes table (±1 per author), edit history (updated_at). Author validation: humans can edit/delete any comment; agents can only modify their own. Comments are loaded into AppState.focalComments on focus change.",
+      "summary": "Ephemeral annotations on nodes with voting and soft delete",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "db_1775200349808_7": {
+      "id": "db_1775200349808_7",
+      "content": "src/lib/db.ts owns all database interactions. Uses pg.Pool with connection string from ZYGOMORPHIC_DB_URL (default: postgresql://rhizome@localhost/zygomorphic). Exports: getPool(), initSchema(), closePool(), loadFullGraph(), getNode(), insertNode(), updateNode(), deleteNode(), insertEdge(), deleteEdge(), getComments(), insertComment(), softDeleteComment(), editComment(), upsertVote(), searchNodes(), getNeighborhood(), getActivityFeed(), getStats(), deleteExpiredComments(), startListening().",
+      "summary": "db.ts: PostgreSQL persistence via pg.Pool",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "schema_1775200349808_8": {
+      "id": "schema_1775200349808_8",
+      "content": "Tables:\n- nodes(id PK, content TEXT, summary TEXT, exploration JSONB, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ)\n- edges(id PK, node_a TEXT FK→nodes, node_b TEXT FK→nodes, label TEXT, created_at TIMESTAMPTZ)\n- comments(id PK, node_id FK→nodes, content TEXT, author TEXT, created_at/updated_at/expires_at/deleted_at TIMESTAMPTZ, score INT)\n- comment_votes(comment_id FK, author TEXT, vote SMALLINT, PRIMARY KEY(comment_id, author))\n\nIndexes on edges.node_a/b, comments.node_id and expires_at, votes.comment_id. Cascade deletes: removing a node drops its edges and comments automatically.",
+      "summary": "Four tables: nodes, edges, comments, comment_votes",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "search_1775200349808_9": {
+      "id": "search_1775200349808_9",
+      "content": "searchNodes(query) runs: SELECT * FROM nodes WHERE content ILIKE $1 OR summary ILIKE $1 LIMIT 50. The query term is wrapped in % wildcards. Results are returned as NodeData objects. Limit of 50 prevents runaway results. Used by the MCP search tool and could be extended to full-text search (tsvector) for better ranking.",
+      "summary": "searchNodes(): case-insensitive ILIKE on content and summary",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "neighborhood_1775200349808_10": {
+      "id": "neighborhood_1775200349808_10",
+      "content": "getNeighborhood(id) returns { node: NodeData | null, edges: Edge[], neighbors: Record<string, NodeData> }. Fetches the focal node, then all edges where node_a = id OR node_b = id, then loads all unique neighbor nodes. Returns empty result (node: null, edges: [], neighbors: {}) for unknown IDs. Used by the MCP get_neighborhood tool for BFS traversal.",
+      "summary": "getNeighborhood(): focal node + direct neighbors + connecting edges",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "realtime_db_1775200349808_11": {
+      "id": "realtime_db_1775200349808_11",
+      "content": "startListening(onGraph, onComments) opens a dedicated pg.Client (not from the pool) and LISTENs on two channels: \"zygomorphic_changes\" with payload \"graph\" or \"comments\". A NOTIFY trigger fires after INSERT/UPDATE/DELETE on nodes, edges, and comments. Notifications are debounced 200ms. On connection loss, retries every 3 seconds. Returns a cleanup function. This eliminates polling and gives sub-second UI updates.",
+      "summary": "LISTEN/NOTIFY: Postgres pushes change notifications to the server",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "state_1775200349808_12": {
+      "id": "state_1775200349808_12",
+      "content": "AppState shape: { screen: AppScreen, loading: boolean, error?: string, graph: GraphData | null, focusNodeId: string | null, focalComments: Comment[], navigationHistory: string[] }. The reduce() function is a pure switch over AppEvent — no side effects, fully unit-testable. All state transitions are expressed as events dispatched through this function. See reducer.test.ts for exhaustive coverage.",
+      "summary": "state.ts: pure AppState + reduce(state, event) -> state",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "events_1775200349808_13": {
+      "id": "events_1775200349808_13",
+      "content": "AppEvent is an exhaustive discriminated union:\n- GRAPH_LOADED: replace entire graph\n- NODE_CREATED, NODE_UPDATED, NODE_DELETED: CRUD on nodes\n- EDGE_CREATED, EDGE_DELETED: CRUD on edges\n- COMMENTS_LOADED, COMMENT_ADDED: comment management\n- EXPLORATION_UPDATED: append exploration entry\n- NAVIGATION_PUSH, NAVIGATION_BACK, FOCUS_CHANGED: navigation\n- ERROR: set error message, clear loading\n\nEach event carries only the data needed for its transition. The reducer handles edge cases (missing nodes, duplicate history entries, etc.) gracefully.",
+      "summary": "AppEvent union: all possible state transitions",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "orch_1775200349808_14": {
+      "id": "orch_1775200349808_14",
+      "content": "Orchestrator extends EventEmitter. Holds current AppState. dispatch(event) pipeline: (1) apply reduce(), (2) persist mutation to Postgres, (3) auto-load comments when focus changes, (4) emit \"state\" for SSE broadcast. Also exposes reload() (full graph reload), reloadComments(), deleteComment(), editComment(), voteComment(). The persist() method maps events to DB calls — only mutating events write to DB; read events (FOCUS_CHANGED, NAVIGATION_*) do not.",
+      "summary": "orchestrator.ts: wires state, DB, and SSE broadcast together",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "mcp_1775200349808_15": {
+      "id": "mcp_1775200349808_15",
+      "content": "src/lib/mcp.ts creates an @modelcontextprotocol/sdk Server. The current graph and dispatch function are injected via setGraph() and setDispatch(). ID generation is time-based with a monotonic counter (format: prefix_timestamp_counter). Tools return MCP content blocks — text for success, isError:true for failures. The server can be connected to stdio transport (for Claude Code / MCP clients) via startStdioServer().",
+      "summary": "mcp.ts: MCP protocol server exposing graph tools to LLM agents",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "mcp_read_1775200349808_16": {
+      "id": "mcp_read_1775200349808_16",
+      "content": "Four read-only tools:\n- get_overview(): node count, edge count, all node IDs + summaries\n- get_node(id): full content, all edges (with neighbor summaries), exploration history\n- get_neighborhood(id, depth=2): BFS from focal node up to depth 10; shows each neighbor's summary and connecting edges\n- search(query): case-insensitive keyword search on content and summary; returns matches with location (content vs summary)\n\nAll tools return formatted markdown text blocks.",
+      "summary": "MCP read tools: get_overview, get_node, get_neighborhood, search",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "mcp_write_1775200349808_17": {
+      "id": "mcp_write_1775200349808_17",
+      "content": "Four mutation tools:\n- create_node(content, summary?, connect_to?, edge_label?): creates node, optionally creates edge to existing node; summary auto-truncated to 120 chars from content if omitted\n- update_node(id, content, summary?): modifies existing node; returns error for unknown id\n- create_edge(a, b, label): creates undirected edge; errors if either node missing\n- delete_edge(edge_id): removes edge by id; errors if edge not found\n\nAll write tools dispatch events via the injected dispatch function.",
+      "summary": "MCP write tools: create_node, update_node, create_edge, delete_edge",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "mcp_explore_1775200349808_18": {
+      "id": "mcp_explore_1775200349808_18",
+      "content": "Two exploration tools:\n- record_exploration(id, agent, conclusion?): appends an ExplorationEntry to the node; errors if node not found\n- get_exploration_state(): returns all nodes that have been explored, grouped by node, showing agent name, timestamp, and conclusion for each entry; returns \"No exploration recorded\" if graph has none\n\nThese tools give agents visibility into collaborative investigation history.",
+      "summary": "MCP exploration tools: record_exploration, get_exploration_state",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "webserver_1775200349808_19": {
+      "id": "webserver_1775200349808_19",
+      "content": "createWebServer(orchestrator, port) starts an http.Server. Endpoints: GET /events (SSE state stream), GET /state (JSON snapshot), GET /activity?sort=recent|score (activity feed), GET /stats (aggregate stats), POST /action (dispatch user actions), GET / (serves index.html). Open CORS. Maintains a list of connected SSE clients; broadcasts on every orchestrator \"state\" event. All action types: navigate, focus, navigate_back, refresh, refresh_comments, delete_comment, edit_comment, vote_comment, add_comment.",
+      "summary": "webserver.ts: HTTP/SSE server bridging the orchestrator and the browser",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "sse_1775200349808_20": {
+      "id": "sse_1775200349808_20",
+      "content": "GET /events upgrades the connection to SSE (Content-Type: text/event-stream). On connect, immediately sends the current state as a \"state\" event. All subsequent orchestrator state emissions are broadcast as \"data: <JSON>\n\n\". Clients auto-reconnect on disconnect (2-second retry in the web UI). This is the primary channel for the UI to stay synchronized with the server and database.",
+      "summary": "GET /events: Server-Sent Events for real-time state push to the browser",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "action_1775200349808_21": {
+      "id": "action_1775200349808_21",
+      "content": "POST /action accepts JSON body with a \"type\" field. Supported types: navigate (focus + push history), focus (focus only), navigate_back (pop history), refresh (full graph reload), refresh_comments (reload focal node's comments), add_comment, delete_comment, edit_comment, vote_comment. Returns 204 on success. The orchestrator handles persistence and state update; the SSE broadcast delivers the result back to all clients.",
+      "summary": "POST /action: dispatches user actions from the browser to the orchestrator",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "ui_1775200349808_22": {
+      "id": "ui_1775200349808_22",
+      "content": "The entire web client is one file: no framework, no bundler, no runtime dependencies. ~840 lines of HTML, CSS, and JavaScript. State arrives via SSE (global state variable). User interactions POST to /action. Three view modes: Graph (default), Activity, Stats. CSS uses GitHub dark theme palette via variables. Monospace font throughout. View transitions animated. Helpers: relative time formatting, HTML escaping, edge-label color mapping.",
+      "summary": "src/web/index.html: single-file vanilla HTML/CSS/JS client",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "graph_view_1775200349808_23": {
+      "id": "graph_view_1775200349808_23",
+      "content": "The graph view shows two panes side by side. Left pane (focal): node ID, summary, full content in monospace pre block, exploration log, link filter chips (one per unique edge label). Right pane (edges): all edges grouped by label; each shows label, neighbor ID, neighbor summary; clicking navigates. Back button pops navigationHistory. Link filter chips narrow the right pane to edges of a specific relation type; clicking again clears the filter.",
+      "summary": "Two-pane graph view: focal node on left, edges on right",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "activity_1775200349808_24": {
+      "id": "activity_1775200349808_24",
+      "content": "Activity view: fetches GET /activity?sort=recent|score. Shows interleaved nodes and comments as cards. Node cards show degree and last-updated time. Comment cards show author, score, parent node summary, and creation time. Sortable by recent (timestamp) or top (score). Filterable by kind (all, nodes, comments).\n\nStats view: fetches GET /stats. Shows summary cards (node count, edge count, comment count), top-connected nodes (by degree), top-commented nodes (by comment count), and edge label distribution as a bar chart.",
+      "summary": "Activity feed and stats: secondary views for discovery and analytics",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "llm_1775200349808_25": {
+      "id": "llm_1775200349808_25",
+      "content": "LlmClient detects ANTHROPIC_API_KEY at construction time. If set, uses @anthropic-ai/sdk directly (faster, more control). If not, spawns claude -p as a subprocess (requires Claude Code or Pro session). Model selected via ZYGOMORPHIC_MODEL env var (default: claude-sonnet-4-6). Methods: call(prompt) -> string, callJSON<T>(prompt) -> T, stream(prompt) -> AsyncGenerator<string>. Retries up to 3 times with 2/4/6s backoff. 180s timeout, 16MB buffer. JSON extracted from fenced code blocks or bare objects/arrays.",
+      "summary": "llm.ts: dual-mode LLM client (Anthropic SDK or claude CLI fallback)",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "electron_1775200349808_26": {
+      "id": "electron_1775200349808_26",
+      "content": "Startup sequence: initSchema() → loadFullGraph() → new Orchestrator() → dispatch GRAPH_LOADED → createWebServer() → startListening() → setInterval(deleteExpiredComments, 5min) → new BrowserWindow(). Window loads the local web server URL. On window close: stop listener, close server, close DB pool. Uses a random available port. BrowserWindow is 1280×900 with dark background. This is the primary deployment target.",
+      "summary": "electron/main.ts: desktop app entry point",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "standalone_1775200349808_27": {
+      "id": "standalone_1775200349808_27",
+      "content": "server/main.ts follows the same startup sequence as the Electron shell but without opening a BrowserWindow. Port from PORT env var (default 3000). Intended for server-side deployment where a browser is not available locally. Built via npm run build:server (tsconfig.server.json). The web UI is still served at GET / and accessible from any browser on the network.",
+      "summary": "server/main.ts: headless server entry point for non-Electron deployment",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "testing_1775200349808_28": {
+      "id": "testing_1775200349808_28",
+      "content": "Four test files:\n- reducer.test.ts: pure unit tests, no DB, covers all AppEvent types\n- mcp.test.ts: unit tests using InMemoryTransport; mock graph + dispatch; covers all 12 tools\n- db.test.ts: integration tests against real Postgres; isolated via per-process schema (SET search_path TO test_<pid>); tests node/edge/comment CRUD, cascade delete, search, neighborhood\n- orchestrator.test.ts: integration tests; full dispatch pipeline including DB persistence; also uses isolated schema\n\nRun with: vitest run (or npm test)",
+      "summary": "Vitest test suite: unit tests (reducer, MCP) and integration tests (db, orchestrator)",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "ci_1775200349808_29": {
+      "id": "ci_1775200349808_29",
+      "content": ".github/workflows/ci.yml runs on push to main and all PRs to main (not on pushes to other branches, to avoid duplicate runs). Job \"check\": spins up postgres:18 service container, sets ZYGOMORPHIC_DB_URL, runs npm ci, then npm run typecheck, then npm test. Node 22. Tests create isolated schemas so they can run in parallel without conflicts.",
+      "summary": "GitHub Actions CI: typecheck and tests on push/PR to main",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "realtime_flow_1775200349808_30": {
+      "id": "realtime_flow_1775200349808_30",
+      "content": "Full path of a change reaching the browser:\n1. Agent calls MCP write tool (or human POSTs /action)\n2. Orchestrator dispatches event → reduce() → persist() writes to Postgres\n3. Postgres NOTIFY fires on the relevant table\n4. startListening() client receives notification (debounced 200ms)\n5. Orchestrator calls reload() → loadFullGraph() from DB\n6. Orchestrator dispatches GRAPH_LOADED, emits \"state\"\n7. Web server broadcasts state to all SSE clients\n8. Browser receives \"state\" event, re-renders UI\n\nTotal latency: typically <300ms end-to-end on localhost.",
+      "summary": "End-to-end real-time flow: DB change → NOTIFY → reload → SSE → UI",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    },
+    "config_1775200349808_31": {
+      "id": "config_1775200349808_31",
+      "content": "Environment variables:\n- ZYGOMORPHIC_DB_URL: Postgres connection string (default: postgresql://rhizome@localhost/zygomorphic)\n- ANTHROPIC_API_KEY: enables Anthropic SDK mode in llm.ts (fallback: claude CLI)\n- ZYGOMORPHIC_MODEL: LLM model ID (default: claude-sonnet-4-6)\n- PORT: standalone server port (default: 3000)\n\nBuild scripts:\n- npm run build: compile Electron app (tsconfig.electron.json)\n- npm run build:server: compile standalone server (tsconfig.server.json)\n- npm start: build + launch Electron\n- npm test: vitest run\n- npm run typecheck: tsc --noEmit",
+      "summary": "Environment variables and runtime configuration",
+      "exploration": [],
+      "created_at": "2026-04-03T07:12:29.808Z",
+      "updated_at": "2026-04-03T07:12:29.808Z"
+    }
+  },
+  "edges": {
+    "e_core_graph": {
+      "id": "e_core_graph",
+      "a": "zygo",
+      "b": "graph-model",
+      "label": "built_on",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_core_pg": {
+      "id": "e_core_pg",
+      "a": "zygo",
+      "b": "postgres",
+      "label": "built_on",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_core_mcp": {
+      "id": "e_core_mcp",
+      "a": "zygo",
+      "b": "mcp-server",
+      "label": "exposes",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_core_ui": {
+      "id": "e_core_ui",
+      "a": "zygo",
+      "b": "carousel-ui",
+      "label": "exposes",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_core_orch": {
+      "id": "e_core_orch",
+      "a": "zygo",
+      "b": "orchestrator",
+      "label": "built_on",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_core_comments": {
+      "id": "e_core_comments",
+      "a": "zygo",
+      "b": "comments",
+      "label": "features",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_graph_pg": {
+      "id": "e_graph_pg",
+      "a": "graph-model",
+      "b": "postgres",
+      "label": "persisted_by",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_orch_reducer": {
+      "id": "e_orch_reducer",
+      "a": "orchestrator",
+      "b": "graph-model",
+      "label": "manages",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_orch_pg": {
+      "id": "e_orch_pg",
+      "a": "orchestrator",
+      "b": "postgres",
+      "label": "writes_to",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_mcp_orch": {
+      "id": "e_mcp_orch",
+      "a": "mcp-server",
+      "b": "orchestrator",
+      "label": "dispatches_to",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_ui_orch": {
+      "id": "e_ui_orch",
+      "a": "carousel-ui",
+      "b": "orchestrator",
+      "label": "receives_from",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_ui_comments": {
+      "id": "e_ui_comments",
+      "a": "carousel-ui",
+      "b": "comments",
+      "label": "displays",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_mcp_comments": {
+      "id": "e_mcp_comments",
+      "a": "mcp-server",
+      "b": "comments",
+      "label": "reads_writes",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_thread_comment": {
+      "id": "e_thread_comment",
+      "a": "threading",
+      "b": "comments",
+      "label": "extends",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_task_comment": {
+      "id": "e_task_comment",
+      "a": "comment-task",
+      "b": "comments",
+      "label": "extends",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_task_thread": {
+      "id": "e_task_thread",
+      "a": "comment-task",
+      "b": "threading",
+      "label": "depends_on",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_reactor_task": {
+      "id": "e_reactor_task",
+      "a": "agent-reactor",
+      "b": "comment-task",
+      "label": "depends_on",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_reactor_mcp": {
+      "id": "e_reactor_mcp",
+      "a": "agent-reactor",
+      "b": "mcp-server",
+      "label": "invokes_via",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_private_pg": {
+      "id": "e_private_pg",
+      "a": "private-subgraphs",
+      "b": "postgres",
+      "label": "requires",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_private_graph": {
+      "id": "e_private_graph",
+      "a": "private-subgraphs",
+      "b": "graph-model",
+      "label": "extends",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_web_ui": {
+      "id": "e_web_ui",
+      "a": "web-deploy",
+      "b": "carousel-ui",
+      "label": "serves",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_web_pg": {
+      "id": "e_web_pg",
+      "a": "web-deploy",
+      "b": "postgres",
+      "label": "connects_to",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_vc_pg": {
+      "id": "e_vc_pg",
+      "a": "version-control",
+      "b": "postgres",
+      "label": "concerns",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_vc_graph": {
+      "id": "e_vc_graph",
+      "a": "version-control",
+      "b": "graph-model",
+      "label": "concerns",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_label_graph": {
+      "id": "e_label_graph",
+      "a": "label-similarity",
+      "b": "graph-model",
+      "label": "extends",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_label_mcp": {
+      "id": "e_label_mcp",
+      "a": "label-similarity",
+      "b": "mcp-server",
+      "label": "exposes_via",
+      "created_at": "2026-04-01T07:04:14.308Z"
+    },
+    "e_1775200349849_32": {
+      "id": "e_1775200349849_32",
+      "a": "zygomorphic_1775200349808_0",
+      "b": "design_1775200349808_1",
+      "label": "embodies",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349851_33": {
+      "id": "e_1775200349851_33",
+      "a": "zygomorphic_1775200349808_0",
+      "b": "model_1775200349808_2",
+      "label": "uses",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349851_34": {
+      "id": "e_1775200349851_34",
+      "a": "zygomorphic_1775200349808_0",
+      "b": "db_1775200349808_7",
+      "label": "persists_via",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349851_35": {
+      "id": "e_1775200349851_35",
+      "a": "zygomorphic_1775200349808_0",
+      "b": "orch_1775200349808_14",
+      "label": "coordinated_by",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349852_36": {
+      "id": "e_1775200349852_36",
+      "a": "zygomorphic_1775200349808_0",
+      "b": "mcp_1775200349808_15",
+      "label": "exposes",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349852_37": {
+      "id": "e_1775200349852_37",
+      "a": "zygomorphic_1775200349808_0",
+      "b": "webserver_1775200349808_19",
+      "label": "served_by",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349852_38": {
+      "id": "e_1775200349852_38",
+      "a": "zygomorphic_1775200349808_0",
+      "b": "electron_1775200349808_26",
+      "label": "packaged_as",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349852_39": {
+      "id": "e_1775200349852_39",
+      "a": "zygomorphic_1775200349808_0",
+      "b": "standalone_1775200349808_27",
+      "label": "deployed_as",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349852_40": {
+      "id": "e_1775200349852_40",
+      "a": "design_1775200349808_1",
+      "b": "mcp_1775200349808_15",
+      "label": "shapes",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349853_41": {
+      "id": "e_1775200349853_41",
+      "a": "model_1775200349808_2",
+      "b": "node_1775200349808_3",
+      "label": "contains",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349853_42": {
+      "id": "e_1775200349853_42",
+      "a": "model_1775200349808_2",
+      "b": "edge_1775200349808_4",
+      "label": "contains",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349853_43": {
+      "id": "e_1775200349853_43",
+      "a": "model_1775200349808_2",
+      "b": "comment_1775200349808_6",
+      "label": "contains",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349854_44": {
+      "id": "e_1775200349854_44",
+      "a": "model_1775200349808_2",
+      "b": "exploration_1775200349808_5",
+      "label": "contains",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349854_45": {
+      "id": "e_1775200349854_45",
+      "a": "db_1775200349808_7",
+      "b": "schema_1775200349808_8",
+      "label": "defines",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349854_46": {
+      "id": "e_1775200349854_46",
+      "a": "db_1775200349808_7",
+      "b": "search_1775200349808_9",
+      "label": "provides",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349854_47": {
+      "id": "e_1775200349854_47",
+      "a": "db_1775200349808_7",
+      "b": "neighborhood_1775200349808_10",
+      "label": "provides",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349854_48": {
+      "id": "e_1775200349854_48",
+      "a": "db_1775200349808_7",
+      "b": "realtime_db_1775200349808_11",
+      "label": "implements",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349854_49": {
+      "id": "e_1775200349854_49",
+      "a": "db_1775200349808_7",
+      "b": "model_1775200349808_2",
+      "label": "loads",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349855_50": {
+      "id": "e_1775200349855_50",
+      "a": "state_1775200349808_12",
+      "b": "events_1775200349808_13",
+      "label": "processes",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349855_51": {
+      "id": "e_1775200349855_51",
+      "a": "state_1775200349808_12",
+      "b": "model_1775200349808_2",
+      "label": "holds",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349855_52": {
+      "id": "e_1775200349855_52",
+      "a": "orch_1775200349808_14",
+      "b": "state_1775200349808_12",
+      "label": "uses",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349855_53": {
+      "id": "e_1775200349855_53",
+      "a": "orch_1775200349808_14",
+      "b": "db_1775200349808_7",
+      "label": "writes_to",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349856_54": {
+      "id": "e_1775200349856_54",
+      "a": "orch_1775200349808_14",
+      "b": "webserver_1775200349808_19",
+      "label": "feeds",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349856_55": {
+      "id": "e_1775200349856_55",
+      "a": "mcp_1775200349808_15",
+      "b": "mcp_read_1775200349808_16",
+      "label": "provides",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349856_56": {
+      "id": "e_1775200349856_56",
+      "a": "mcp_1775200349808_15",
+      "b": "mcp_write_1775200349808_17",
+      "label": "provides",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349856_57": {
+      "id": "e_1775200349856_57",
+      "a": "mcp_1775200349808_15",
+      "b": "mcp_explore_1775200349808_18",
+      "label": "provides",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349857_58": {
+      "id": "e_1775200349857_58",
+      "a": "mcp_1775200349808_15",
+      "b": "orch_1775200349808_14",
+      "label": "dispatches_via",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349857_59": {
+      "id": "e_1775200349857_59",
+      "a": "mcp_1775200349808_15",
+      "b": "model_1775200349808_2",
+      "label": "reads",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349858_60": {
+      "id": "e_1775200349858_60",
+      "a": "webserver_1775200349808_19",
+      "b": "sse_1775200349808_20",
+      "label": "exposes",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349858_61": {
+      "id": "e_1775200349858_61",
+      "a": "webserver_1775200349808_19",
+      "b": "action_1775200349808_21",
+      "label": "exposes",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349858_62": {
+      "id": "e_1775200349858_62",
+      "a": "webserver_1775200349808_19",
+      "b": "ui_1775200349808_22",
+      "label": "serves",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349858_63": {
+      "id": "e_1775200349858_63",
+      "a": "ui_1775200349808_22",
+      "b": "graph_view_1775200349808_23",
+      "label": "contains",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349858_64": {
+      "id": "e_1775200349858_64",
+      "a": "ui_1775200349808_22",
+      "b": "activity_1775200349808_24",
+      "label": "contains",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349859_65": {
+      "id": "e_1775200349859_65",
+      "a": "ui_1775200349808_22",
+      "b": "sse_1775200349808_20",
+      "label": "connects_to",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349859_66": {
+      "id": "e_1775200349859_66",
+      "a": "ui_1775200349808_22",
+      "b": "action_1775200349808_21",
+      "label": "posts_to",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349859_67": {
+      "id": "e_1775200349859_67",
+      "a": "llm_1775200349808_25",
+      "b": "orch_1775200349808_14",
+      "label": "used_by",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349859_68": {
+      "id": "e_1775200349859_68",
+      "a": "electron_1775200349808_26",
+      "b": "orch_1775200349808_14",
+      "label": "initializes",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349860_69": {
+      "id": "e_1775200349860_69",
+      "a": "electron_1775200349808_26",
+      "b": "db_1775200349808_7",
+      "label": "initializes",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349860_70": {
+      "id": "e_1775200349860_70",
+      "a": "standalone_1775200349808_27",
+      "b": "orch_1775200349808_14",
+      "label": "initializes",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349860_71": {
+      "id": "e_1775200349860_71",
+      "a": "standalone_1775200349808_27",
+      "b": "db_1775200349808_7",
+      "label": "initializes",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349860_72": {
+      "id": "e_1775200349860_72",
+      "a": "realtime_db_1775200349808_11",
+      "b": "realtime_flow_1775200349808_30",
+      "label": "part_of",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349860_73": {
+      "id": "e_1775200349860_73",
+      "a": "sse_1775200349808_20",
+      "b": "realtime_flow_1775200349808_30",
+      "label": "part_of",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349861_74": {
+      "id": "e_1775200349861_74",
+      "a": "orch_1775200349808_14",
+      "b": "realtime_flow_1775200349808_30",
+      "label": "part_of",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349861_75": {
+      "id": "e_1775200349861_75",
+      "a": "testing_1775200349808_28",
+      "b": "db_1775200349808_7",
+      "label": "covers",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349861_76": {
+      "id": "e_1775200349861_76",
+      "a": "testing_1775200349808_28",
+      "b": "mcp_1775200349808_15",
+      "label": "covers",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349861_77": {
+      "id": "e_1775200349861_77",
+      "a": "testing_1775200349808_28",
+      "b": "state_1775200349808_12",
+      "label": "covers",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349862_78": {
+      "id": "e_1775200349862_78",
+      "a": "testing_1775200349808_28",
+      "b": "orch_1775200349808_14",
+      "label": "covers",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349862_79": {
+      "id": "e_1775200349862_79",
+      "a": "ci_1775200349808_29",
+      "b": "testing_1775200349808_28",
+      "label": "runs",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349862_80": {
+      "id": "e_1775200349862_80",
+      "a": "ci_1775200349808_29",
+      "b": "config_1775200349808_31",
+      "label": "uses",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349862_81": {
+      "id": "e_1775200349862_81",
+      "a": "config_1775200349808_31",
+      "b": "db_1775200349808_7",
+      "label": "configures",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349862_82": {
+      "id": "e_1775200349862_82",
+      "a": "config_1775200349808_31",
+      "b": "llm_1775200349808_25",
+      "label": "configures",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    },
+    "e_1775200349863_83": {
+      "id": "e_1775200349863_83",
+      "a": "config_1775200349808_31",
+      "b": "standalone_1775200349808_27",
+      "label": "configures",
+      "created_at": "2026-04-03T07:12:29.808Z"
+    }
+  }
+}
