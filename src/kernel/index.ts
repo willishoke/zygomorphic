@@ -1,0 +1,10 @@
+export type { ArtifactType, ValidatorSpec, MorphismBody, Term } from './types.js';
+export { id, morphism, compose } from './types.js';
+export type { MorphismType } from './type-check.js';
+export { typesEqual, inferType, TypeError } from './type-check.js';
+export type { Artifact, ExecutionNode, BodyExecutor } from './executor.js';
+export { buildGraph, execute } from './executor.js';
+export type { ValidationResult } from './validate.js';
+export { validate } from './validate.js';
+export type { Factoring } from './factor.js';
+export { applyFactoring } from './factor.js';

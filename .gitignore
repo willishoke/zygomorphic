@@ -5,3 +5,6 @@ dist/
 build/
 .env
 node_modules/
+.zygomorphic/.index.db
+.zygomorphic/.index.db-wal
+.zygomorphic/.index.db-shm
