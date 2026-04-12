@@ -13,3 +13,5 @@ export type { MorphismDef } from './registry.js';
 export { MorphismRegistry } from './registry.js';
 export type { Factoring } from './factor.js';
 export { applyFactoring } from './factor.js';
+export type { Rewrite, RewriteType } from './rewrite.js';
+export { id2, factor, fuse, vertical, horizontal, rewriteSource, rewriteTarget, checkRewrite, invertRewrite, applyRewrite } from './rewrite.js';
