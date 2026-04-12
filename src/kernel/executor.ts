@@ -41,6 +41,10 @@ function flatten(term: Term, out: ExecutionNode[]): void {
       flatten(term.first, out);
       flatten(term.second, out);
       return;
+    case 'tensor':
+      throw new Error('Tensor execution requires signal/slot executor (not yet implemented)');
+    case 'trace':
+      throw new Error('Trace execution requires signal/slot executor (not yet implemented)');
   }
 }
 
