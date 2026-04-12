@@ -1,5 +1,5 @@
 export type { ArtifactType, ValidatorSpec, MorphismBody, Autonomy, Term } from './types.js';
-export { id, morphism, compose, tensor, trace, composeAll, tensorAll, UnitType, productType, isUnit, typeToString } from './types.js';
+export { id, morphism, compose, tensor, trace, composeAll, tensorAll, UnitType, productType, sumType, isUnit, isSumType, typeToString } from './types.js';
 export type { MorphismType } from './type-check.js';
 export { typesEqual, inferType, typeCheck, TypeError } from './type-check.js';
 export type { Artifact, ExecutionNode, BodyExecutor } from './executor.js';

@@ -49,6 +49,11 @@ function validatorSpecEqual(a: ValidatorSpec, b: ValidatorSpec): boolean {
       if (a.steps.length !== bs.steps.length) return false;
       return a.steps.every((s, i) => validatorSpecEqual(s, bs.steps[i]));
     }
+    case 'sum': {
+      const bsum = b as typeof a;
+      return validatorSpecEqual(a.left, bsum.left)
+        && validatorSpecEqual(a.right, bsum.right);
+    }
   }
 }
 
