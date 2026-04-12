@@ -15,3 +15,6 @@ export type { Factoring } from './factor.js';
 export { applyFactoring } from './factor.js';
 export type { Rewrite, RewriteType } from './rewrite.js';
 export { id2, factor, fuse, vertical, horizontal, rewriteSource, rewriteTarget, checkRewrite, invertRewrite, applyRewrite } from './rewrite.js';
+export type { CellOps } from './cell-ops.js';
+export { checkCompose, cellBoundary, isIdentity, CellTypeError } from './cell-ops.js';
+export { termOps, rewriteOps } from './cell-ops-instances.js';
