@@ -24,3 +24,5 @@ export type { HumanFeedback, ApproveGate } from './autonomy.js';
 export { createGate, resolveGate, escalate, canProceed, requiresHuman } from './autonomy.js';
 export type { MorphismStatus, MorphismData } from './morphism-store.js';
 export { MorphismStore } from './morphism-store.js';
+export type { BranchInfo, FactoringLogEntry, MergeResult } from './git-ops.js';
+export { branchName, createBranch, tensorBranches, mergeBranch, factoringHistory, morphismHistory, hasPlanChanges, activeBranches } from './git-ops.js';
