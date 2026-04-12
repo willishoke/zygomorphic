@@ -7,5 +7,7 @@ export { buildGraph, execute } from './executor.js';
 export type { ValidationResult } from './validate.js';
 export { validate } from './validate.js';
 export { optimize, eliminateIdentity, flattenCompose, flattenTensor, termEqual, termSize, composeDepth } from './optimizer.js';
+export type { TopologicalResult } from './graph.js';
+export { topologicalSort, tarjanSCC } from './graph.js';
 export type { Factoring } from './factor.js';
 export { applyFactoring } from './factor.js';
