@@ -15,7 +15,28 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
-import type { NodeData, ExplorationEntry, TreeData } from './types.js';
+import type { ExplorationEntry } from './types.js';
+
+// Workspace-mirror node — distinct from the graph NodeData in types.ts
+export interface NodeData {
+  id: string;
+  path: string;
+  name: string;
+  parent_id: string | null;
+  is_leaf: boolean;
+  depth: number;
+  role: string | null;
+  detail: string | null;
+  assessed_at_commit: string | null;
+  created_at: string;
+  updated_at: string;
+  exploration: ExplorationEntry[];
+}
+
+export interface TreeData {
+  root_id: string;
+  nodes: Record<string, NodeData>;
+}
 
 export const STORE_DIR = '.zygomorphic';
 const DB_FILENAME = '.index.db';
