@@ -22,3 +22,5 @@ export type { Artifact as SignalArtifact, SumValue, BodyExecutor as SignalBodyEx
 export { signalExecute, isSumValue, ExecutionError } from './signal-executor.js';
 export type { HumanFeedback, ApproveGate } from './autonomy.js';
 export { createGate, resolveGate, escalate, canProceed, requiresHuman } from './autonomy.js';
+export type { MorphismStatus, MorphismData } from './morphism-store.js';
+export { MorphismStore } from './morphism-store.js';
