@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { buildGraph, execute } from '../executor.js';
 import type { Artifact, BodyExecutor } from '../executor.js';
-import { morphism, compose, id } from '../types.js';
+import { morphism, compose, tensor, trace, id } from '../types.js';
 import type { ArtifactType } from '../types.js';
-import { inferType } from '../type-check.js';
 
-const RawText: ArtifactType = { name: 'RawText', validator: { kind: 'llm_output' } };
-const ValidJSON: ArtifactType = { name: 'ValidJSON', validator: { kind: 'valid_json' } };
+const RawText: ArtifactType = { name: 'RawText', validator: { kind: 'none' } };
+const ValidJSON: ArtifactType = { name: 'ValidJSON', validator: { kind: 'schema' } };
 
 // A mock executor that transforms values based on body kind
 const mockExecutor: BodyExecutor = async (body, input) => {
@@ -17,6 +16,8 @@ const mockExecutor: BodyExecutor = async (body, input) => {
       return JSON.stringify({ tool: body.command, input: input.value });
     case 'human':
       return JSON.stringify({ human: body.description, input: input.value });
+    case 'plan':
+      return JSON.stringify({ plan: body.description, input: input.value });
   }
 };
 
@@ -52,6 +53,17 @@ describe('buildGraph', () => {
     const nodes = buildGraph(id(RawText));
     expect(nodes).toHaveLength(0);
   });
+
+  it('throws on tensor (not yet implemented)', () => {
+    const f = morphism('f', RawText, ValidJSON, { kind: 'agent', prompt: '' });
+    const g = morphism('g', RawText, ValidJSON, { kind: 'agent', prompt: '' });
+    expect(() => buildGraph(tensor(f, g))).toThrow(/not yet implemented/);
+  });
+
+  it('throws on trace (not yet implemented)', () => {
+    const f = morphism('f', RawText, RawText, { kind: 'agent', prompt: '' });
+    expect(() => buildGraph(trace(RawText, null, f))).toThrow(/not yet implemented/);
+  });
 });
 
 describe('execute', () => {
@@ -75,7 +87,6 @@ describe('execute', () => {
 
     const result = await execute(graph, input, mockExecutor);
     expect(result.type).toBe(ValidJSON);
-    // Second node received the output of the first
     const parsed = JSON.parse(result.value as string);
     expect(parsed.tool).toBe('jq');
   });

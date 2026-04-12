@@ -4,9 +4,12 @@ import { morphism } from '../types.js';
 import { inferType, typesEqual, TypeError } from '../type-check.js';
 import type { ArtifactType } from '../types.js';
 
-const Spec: ArtifactType = { name: 'Spec', validator: { kind: 'llm_output' } };
-const Code: ArtifactType = { name: 'Code', validator: { kind: 'valid_json' } };
-const Tested: ArtifactType = { name: 'Tested', validator: { kind: 'passes_tests', suite: 'unit' } };
+const Spec: ArtifactType = { name: 'Spec', validator: { kind: 'none' } };
+const Code: ArtifactType = { name: 'Code', validator: { kind: 'schema' } };
+const Tested: ArtifactType = {
+  name: 'Tested',
+  validator: { kind: 'command', command: 'npx', args: ['vitest', 'run'], expectedExit: 0 },
+};
 
 describe('applyFactoring', () => {
   it('accepts a valid factoring', () => {
