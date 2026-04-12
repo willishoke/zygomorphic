@@ -9,5 +9,7 @@ export { validate } from './validate.js';
 export { optimize, eliminateIdentity, flattenCompose, flattenTensor, termEqual, termSize, composeDepth } from './optimizer.js';
 export type { TopologicalResult } from './graph.js';
 export { topologicalSort, tarjanSCC } from './graph.js';
+export type { MorphismDef } from './registry.js';
+export { MorphismRegistry } from './registry.js';
 export type { Factoring } from './factor.js';
 export { applyFactoring } from './factor.js';
