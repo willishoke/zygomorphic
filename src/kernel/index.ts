@@ -6,5 +6,6 @@ export type { Artifact, ExecutionNode, BodyExecutor } from './executor.js';
 export { buildGraph, execute } from './executor.js';
 export type { ValidationResult } from './validate.js';
 export { validate } from './validate.js';
+export { optimize, eliminateIdentity, flattenCompose, flattenTensor, termEqual, termSize, composeDepth } from './optimizer.js';
 export type { Factoring } from './factor.js';
 export { applyFactoring } from './factor.js';
