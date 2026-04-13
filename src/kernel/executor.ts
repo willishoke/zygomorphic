@@ -1,4 +1,5 @@
 import type { ArtifactType, MorphismBody, Term } from './types.js';
+import { productType, isSumValue } from './types.js';
 import { inferType } from './type-check.js';
 import { validate } from './validate.js';
 
@@ -45,6 +46,76 @@ function flatten(term: Term, out: ExecutionNode[]): void {
       throw new Error('Tensor execution requires signal/slot executor (not yet implemented)');
     case 'trace':
       throw new Error('Trace execution requires signal/slot executor (not yet implemented)');
+  }
+}
+
+/**
+ * Execute any term recursively.
+ *
+ * Handles id, morphism, compose, and trace (conditional feedback loop).
+ * Tensor still delegates to the signal/slot executor.
+ *
+ * Trace semantics: body runs with A⊗S input and produces a SumValue.
+ *   left(b)  → exit the loop, return b as the output
+ *   right(s) → update state to s, iterate
+ */
+export async function executeTerm(
+  term: Term,
+  input: Artifact,
+  bodyExecutor: BodyExecutor,
+  maxIterations = 100,
+): Promise<Artifact> {
+  switch (term.tag) {
+    case 'id':
+      return input;
+
+    case 'morphism': {
+      const rawOutput = await bodyExecutor(term.body, input);
+      const result = await validate(term.cod.validator, rawOutput);
+      if (!result.passed) {
+        throw new Error(
+          `Validation failed for morphism "${term.name}": ${result.errors?.join(', ')}`,
+        );
+      }
+      return { type: term.cod, value: rawOutput };
+    }
+
+    case 'compose': {
+      const mid = await executeTerm(term.first, input, bodyExecutor, maxIterations);
+      return executeTerm(term.second, mid, bodyExecutor, maxIterations);
+    }
+
+    case 'tensor':
+      throw new Error('Tensor execution requires signal/slot executor (not yet implemented)');
+
+    case 'trace': {
+      const traceType = inferType(term);  // { dom: A, cod: B }
+      let state: unknown = term.init;
+
+      for (let i = 0; i < maxIterations; i++) {
+        const productInput: Artifact = {
+          type: productType([input.type, term.stateType]),
+          value: [input.value, state],
+        };
+
+        const bodyOutput = await executeTerm(term.body, productInput, bodyExecutor, maxIterations);
+
+        if (!isSumValue(bodyOutput.value)) {
+          throw new Error(
+            `Trace body must produce a SumValue (left/right injection), got: `
+            + JSON.stringify(bodyOutput.value),
+          );
+        }
+
+        if (bodyOutput.value.tag === 'left') {
+          return { type: traceType.cod, value: bodyOutput.value.value };
+        }
+
+        state = bodyOutput.value.value;
+      }
+
+      throw new Error(`Trace did not converge after ${maxIterations} iterations`);
+    }
   }
 }
 

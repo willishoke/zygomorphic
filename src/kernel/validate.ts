@@ -14,6 +14,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Ajv } from 'ajv';
 import type { ValidatorSpec } from './types.js';
+import { isSumValue } from './types.js';
 
 const execFileAsync = promisify(execFile);
 const ajv = new Ajv();
@@ -82,7 +83,12 @@ export async function validate(spec: ValidatorSpec, artifact: unknown): Promise<
     }
 
     case 'sum': {
-      // Sum validation: artifact must satisfy either left or right
+      // Tagged injection: validate only the branch that was taken
+      if (isSumValue(artifact)) {
+        const branch = artifact.tag === 'left' ? spec.left : spec.right;
+        return validate(branch, artifact.value);
+      }
+      // Untagged fallback: artifact must satisfy either branch (type-checking use)
       const leftResult = await validate(spec.left, artifact);
       if (leftResult.passed) return { passed: true };
       const rightResult = await validate(spec.right, artifact);
