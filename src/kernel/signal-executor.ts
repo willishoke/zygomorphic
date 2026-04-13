@@ -17,43 +17,25 @@
  * structure is encoded in the wiring. Locality is load-bearing.
  */
 
-import type { ArtifactType, MorphismBody, Term } from './types.js';
-import { productType, sumType } from './types.js';
-import { inferType, typesEqual } from './type-check.js';
+import type { ArtifactType, Term, Artifact, BodyExecutor, SumValue } from './types.js';
+import { productType, isSumValue } from './types.js';
+import { inferType } from './type-check.js';
 import { validate } from './validate.js';
+import { escalate } from './autonomy.js';
 
-// --- Runtime value types ---
-
-export interface Artifact {
-  type: ArtifactType;
-  value: unknown;
-}
-
-/**
- * Runtime representation of a sum-type value (B + S).
- * Left injection exits the trace; right injection feeds back.
- */
-export interface SumValue {
-  tag: 'left' | 'right';
-  value: unknown;
-}
-
-export function isSumValue(v: unknown): v is SumValue {
-  return typeof v === 'object' && v !== null && 'tag' in v
-    && ((v as SumValue).tag === 'left' || (v as SumValue).tag === 'right');
-}
-
-// --- Executor interface ---
-
-/**
- * Execute a morphism body given an input artifact. Returns the raw output.
- * For trace bodies, must return a SumValue indicating exit or retry.
- */
-export type BodyExecutor = (body: MorphismBody, input: Artifact) => Promise<unknown>;
+// Re-export consolidated runtime types so callers don't need a second import.
+export type { Artifact, BodyExecutor, SumValue } from './types.js';
+export { isSumValue } from './types.js';
 
 export interface ExecutionOptions {
   /** Maximum trace iterations before aborting. Default: 100. */
   maxTraceIterations?: number;
+  /**
+   * Iteration count at which an auto-autonomy trace escalates.
+   * Escalation throws EscalationError so the caller can route to human review.
+   * Default: half of maxTraceIterations.
+   */
+  escalationThreshold?: number;
 }
 
 // --- Signal/slot executor ---
@@ -120,9 +102,23 @@ export async function signalExecute(
         // Each iteration: body receives [A_value, state], returns SumValue.
         // Left(B) exits. Right(S') retries with new state.
         const bodyType = inferType(t.body);
+        const exitType = inferType(t);
+        const threshold = options.escalationThreshold ?? Math.ceil(maxIter / 2);
         let state: unknown = t.init;
+        // Autonomy starts at auto; escalation may promote it to approve.
+        let autonomy = 'auto' as import('./types.js').Autonomy;
 
         for (let i = 0; i < maxIter; i++) {
+          // Escalation check: auto traces that aren't converging promote to approve.
+          autonomy = escalate(autonomy, i, threshold);
+          if (autonomy !== 'auto') {
+            throw new EscalationError(
+              `Trace did not converge after ${i} iterations — escalating to human review`,
+              i,
+              state,
+            );
+          }
+
           // Build body input: A ⊗ S
           const bodyInput: Artifact = {
             type: bodyType.dom,
@@ -142,8 +138,6 @@ export async function signalExecute(
           const sum = bodyOutput.value;
 
           if (sum.tag === 'left') {
-            // Exit: left injection is the output type B
-            const exitType = inferType({ tag: 'trace', stateType: t.stateType, init: t.init, body: t.body });
             return { type: exitType.cod, value: sum.value };
           }
 
@@ -167,6 +161,21 @@ export class ExecutionError extends Error {
   override name = 'ExecutionError';
   constructor(message: string) {
     super(message);
+  }
+}
+
+/**
+ * Thrown when a trace escalates from auto to approve.
+ * Carries enough context for the caller to route to human review.
+ */
+export class EscalationError extends Error {
+  override name = 'EscalationError';
+  readonly iterations: number;
+  readonly currentState: unknown;
+  constructor(message: string, iterations: number, currentState: unknown) {
+    super(message);
+    this.iterations = iterations;
+    this.currentState = currentState;
   }
 }
 

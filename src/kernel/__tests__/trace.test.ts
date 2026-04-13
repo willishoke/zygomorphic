@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { executeTerm } from '../executor.js';
-import type { Artifact, BodyExecutor } from '../executor.js';
+import { signalExecute } from '../signal-executor.js';
+import type { Artifact, BodyExecutor } from '../types.js';
 import { morphism, compose, trace, left, right, sumType, productType } from '../types.js';
 import type { ArtifactType } from '../types.js';
 
@@ -21,7 +21,7 @@ const RawAndError = productType([Raw, Error]);
 describe('executeTerm: id passthrough', () => {
   it('returns input unchanged', async () => {
     const input: Artifact = { type: Raw, value: 'hello' };
-    const result = await executeTerm({ tag: 'id', portType: Raw }, input, async () => '');
+    const result = await signalExecute({ tag: 'id', portType: Raw }, input, async () => '');
     expect(result.value).toBe('hello');
   });
 });
@@ -30,7 +30,7 @@ describe('executeTerm: single morphism', () => {
   it('runs body and validates output', async () => {
     const m = morphism('gen', Raw, Valid, { kind: 'agent', prompt: 'go' });
     const executor: BodyExecutor = async () => '{"ok":true}';
-    const result = await executeTerm(m, { type: Raw, value: 'in' }, executor);
+    const result = await signalExecute(m, { type: Raw, value: 'in' }, executor);
     expect(result.type).toBe(Valid);
     expect(result.value).toBe('{"ok":true}');
   });
@@ -45,7 +45,7 @@ describe('executeTerm: compose', () => {
       calls.push(body.kind === 'agent' ? 'agent' : 'tool');
       return '{}';
     };
-    await executeTerm(compose(f, g), { type: Raw, value: 'x' }, executor);
+    await signalExecute(compose(f, g), { type: Raw, value: 'x' }, executor);
     expect(calls).toEqual(['agent', 'tool']);
   });
 });
@@ -57,7 +57,7 @@ describe('conditional trace: exits on left', () => {
 
     const executor: BodyExecutor = async () => left('{"result":"done"}');
 
-    const result = await executeTerm(
+    const result = await signalExecute(
       trace(Error, '""', body),
       { type: Raw, value: 'input' },
       executor,
@@ -84,7 +84,7 @@ describe('conditional trace: retries then exits', () => {
       return left('{"final":true}');
     };
 
-    const result = await executeTerm(
+    const result = await signalExecute(
       trace(Error, 'null', body),
       { type: Raw, value: 'start' },
       executor,
@@ -110,7 +110,7 @@ describe('conditional trace: state is threaded correctly', () => {
       return left('{}');
     };
 
-    await executeTerm(
+    await signalExecute(
       trace(Error, '"initial"', body),
       { type: Raw, value: 'x' },
       executor,
@@ -126,7 +126,7 @@ describe('conditional trace: convergence guard', () => {
     const executor: BodyExecutor = async () => right('""');
 
     await expect(
-      executeTerm(trace(Error, '""', body), { type: Raw, value: 'x' }, executor, 5),
+      signalExecute(trace(Error, '""', body), { type: Raw, value: 'x' }, executor, { maxTraceIterations: 5, escalationThreshold: 10 }),
     ).rejects.toThrow(/did not converge.*5/i);
   });
 });
@@ -137,7 +137,7 @@ describe('conditional trace: non-SumValue output throws', () => {
     const executor: BodyExecutor = async () => '{"this":"is not a SumValue"}';
 
     await expect(
-      executeTerm(trace(Error, '""', body), { type: Raw, value: 'x' }, executor),
+      signalExecute(trace(Error, '""', body), { type: Raw, value: 'x' }, executor),
     ).rejects.toThrow(/SumValue/);
   });
 });
@@ -167,7 +167,7 @@ describe('conditional trace: compose inside trace body', () => {
       return left(JSON.stringify({ validated: true, attempt }));
     };
 
-    const result = await executeTerm(
+    const result = await signalExecute(
       trace(Error, 'null', body),
       { type: Raw, value: 'spec' },
       executor,

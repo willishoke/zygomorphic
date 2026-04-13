@@ -119,6 +119,20 @@ export function isSumValue(x: unknown): x is SumValue {
   );
 }
 
+// --- Runtime artifact and executor ---
+
+/** A typed value in the execution engine. */
+export interface Artifact {
+  type: ArtifactType;
+  value: unknown;
+}
+
+/**
+ * Execute a morphism body given an input artifact.
+ * For trace bodies (sum-type codomain), must return a SumValue.
+ */
+export type BodyExecutor = (body: MorphismBody, input: Artifact) => Promise<unknown>;
+
 // --- Morphisms (1-cells): Terms ---
 
 export type MorphismBody =
