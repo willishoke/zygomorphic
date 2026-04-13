@@ -16,6 +16,7 @@ export type ValidatorSpec =
   | { kind: 'schema'; schema?: object }
   | { kind: 'tensor'; checks: ValidatorSpec[] }
   | { kind: 'sequence'; steps: ValidatorSpec[] }
+  | { kind: 'sum'; left: ValidatorSpec; right: ValidatorSpec }
   | { kind: 'human'; prompt: string }
   | { kind: 'none' }
 
@@ -72,6 +73,27 @@ export function productType(factors: ArtifactType[]): ArtifactType {
     name: flat.map(f => f.name).join(' \u2297 '),
     validator: { kind: 'tensor', checks: flat.map(f => f.validator) },
   };
+}
+
+/**
+ * Construct a sum (coproduct) type from two alternatives.
+ * Represents Either<Left, Right> — the trace exit condition.
+ *
+ *   sumType(A, UnitType) = A       (right unit eliminated)
+ *   sumType(UnitType, A) = A       (left unit eliminated)
+ */
+export function sumType(left: ArtifactType, right: ArtifactType): ArtifactType {
+  if (isUnit(left)) return right;
+  if (isUnit(right)) return left;
+  return {
+    name: `${left.name} + ${right.name}`,
+    validator: { kind: 'sum', left: left.validator, right: right.validator },
+  };
+}
+
+/** Check if a type is a sum (coproduct). */
+export function isSumType(t: ArtifactType): boolean {
+  return t.validator.kind === 'sum';
 }
 
 /** Human-readable string for an artifact type. */

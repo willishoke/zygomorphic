@@ -4,9 +4,8 @@
  * Every term has a domain (input type) and codomain (output type).
  * Composition requires cod(first) = dom(second).
  * Tensor produces product types on domain and codomain.
- * Trace requires body : A⊗S -> B⊗S, inferring the external type from the body.
- *
- * Migrated from tropical's type_check.ts with 100% logic transfer.
+ * Trace requires body : A⊗S -> B+S (conditional trace with sum-type codomain).
+ *   Left injection (B) exits the trace. Right injection (S) feeds back.
  */
 
 import type { ArtifactType, ValidatorSpec, Term } from './types.js';
@@ -48,6 +47,11 @@ function validatorSpecEqual(a: ValidatorSpec, b: ValidatorSpec): boolean {
       const bs = b as typeof a;
       if (a.steps.length !== bs.steps.length) return false;
       return a.steps.every((s, i) => validatorSpecEqual(s, bs.steps[i]));
+    }
+    case 'sum': {
+      const bsum = b as typeof a;
+      return validatorSpecEqual(a.left, bsum.left)
+        && validatorSpecEqual(a.right, bsum.right);
     }
   }
 }
@@ -93,24 +97,24 @@ export function inferType(term: Term): MorphismType {
 
     case 'trace': {
       const bodyType = inferType(term.body);
-      // body must be A⊗S -> B⊗S
-      const domFactors = splitTraceType(bodyType.dom, term.stateType);
-      const codFactors = splitTraceType(bodyType.cod, term.stateType);
+      // body must be A⊗S -> B+S (product domain, sum codomain)
+      const domSplit = splitProductType(bodyType.dom, term.stateType);
+      const codSplit = splitSumType(bodyType.cod, term.stateType);
 
-      if (domFactors === null) {
+      if (domSplit === null) {
         throw new TypeError(
-          `Trace: body domain ${bodyType.dom.name} does not contain `
-          + `state type ${term.stateType.name}`,
+          `Trace: body domain "${bodyType.dom.name}" does not contain `
+          + `state type "${term.stateType.name}" as product factor`,
         );
       }
-      if (codFactors === null) {
+      if (codSplit === null) {
         throw new TypeError(
-          `Trace: body codomain ${bodyType.cod.name} does not contain `
-          + `state type ${term.stateType.name}`,
+          `Trace: body codomain "${bodyType.cod.name}" is not a sum type `
+          + `with "${term.stateType.name}" as right branch`,
         );
       }
 
-      return { dom: domFactors.rest, cod: codFactors.rest };
+      return { dom: domSplit.rest, cod: codSplit.rest };
     }
   }
 }
@@ -120,9 +124,9 @@ export function inferType(term: Term): MorphismType {
  * S is expected to be the last factor in a product.
  * Returns null if S is not found.
  *
- * From tropical type_check.ts:98-134.
+ * Used for trace domain: the input side is always a product.
  */
-function splitTraceType(
+function splitProductType(
   t: ArtifactType,
   stateType: ArtifactType,
 ): { rest: ArtifactType } | null {
@@ -170,6 +174,35 @@ function splitTraceType(
   }
 
   return null;
+}
+
+/**
+ * Given a type that should be of the form B+S, split out S and return the rest (B).
+ * The right branch of the sum must match the state type.
+ * Returns null if the type is not a sum or S is not found.
+ *
+ * Used for trace codomain: the conditional trace has sum-type output
+ * where left injection exits and right injection feeds back.
+ */
+function splitSumType(
+  t: ArtifactType,
+  stateType: ArtifactType,
+): { rest: ArtifactType } | null {
+  if (t.validator.kind !== 'sum') return null;
+
+  // Reconstruct left and right ArtifactTypes from the sum
+  const plusIdx = t.name.indexOf(' + ');
+  if (plusIdx === -1) return null;
+
+  const leftName = t.name.slice(0, plusIdx);
+  const rightName = t.name.slice(plusIdx + 3);
+
+  const rightType: ArtifactType = { name: rightName, validator: t.validator.right };
+
+  if (!typesEqual(rightType, stateType)) return null;
+
+  const leftType: ArtifactType = { name: leftName, validator: t.validator.left };
+  return { rest: leftType };
 }
 
 /**

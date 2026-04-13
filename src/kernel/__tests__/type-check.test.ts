@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { inferType, typesEqual, TypeError } from '../type-check.js';
-import { id, morphism, compose, tensor, trace, UnitType, productType } from '../types.js';
+import { id, morphism, compose, tensor, trace, UnitType, productType, sumType } from '../types.js';
 import type { ArtifactType } from '../types.js';
 
 // --- Fixture types ---
@@ -74,6 +74,14 @@ describe('typesEqual', () => {
     };
     expect(typesEqual(a, b)).toBe(true);
   });
+
+  it('compares sum validators structurally', () => {
+    const a = sumType(RawText, ValidJSON);
+    const b = sumType(RawText, ValidJSON);
+    const c = sumType(ValidJSON, RawText); // different order
+    expect(typesEqual(a, b)).toBe(true);
+    expect(typesEqual(a, c)).toBe(false);
+  });
 });
 
 describe('inferType', () => {
@@ -140,29 +148,74 @@ describe('inferType — tensor', () => {
   });
 });
 
-describe('inferType — trace', () => {
-  it('traces out state type from product', () => {
-    // body: (RawText ⊗ ValidJSON) -> (CompilingTS ⊗ ValidJSON), state = ValidJSON
+describe('inferType — trace (conditional: A⊗S → B+S)', () => {
+  it('traces with product domain and sum codomain', () => {
+    // body: (RawText ⊗ ValidJSON) -> (CompilingTS + ValidJSON), state = ValidJSON
     // trace should produce: RawText -> CompilingTS
     const dom = productType([RawText, ValidJSON]);
-    const cod = productType([CompilingTS, ValidJSON]);
+    const cod = sumType(CompilingTS, ValidJSON);
     const body = morphism('f', dom, cod, { kind: 'agent', prompt: '' });
     const t = inferType(trace(ValidJSON, null, body));
     expect(typesEqual(t.dom, RawText)).toBe(true);
     expect(typesEqual(t.cod, CompilingTS)).toBe(true);
   });
 
-  it('trace where entire type is state produces Unit', () => {
-    // body: RawText -> RawText, state = RawText
-    // trace should produce: Unit -> Unit
-    const body = morphism('f', RawText, RawText, { kind: 'agent', prompt: '' });
-    const t = inferType(trace(RawText, null, body));
+  it('trace where entire domain is state produces Unit domain', () => {
+    // body: ValidJSON -> (CompilingTS + ValidJSON), state = ValidJSON
+    // trace should produce: Unit -> CompilingTS
+    const cod = sumType(CompilingTS, ValidJSON);
+    const body = morphism('f', ValidJSON, cod, { kind: 'agent', prompt: '' });
+    const t = inferType(trace(ValidJSON, null, body));
     expect(typesEqual(t.dom, UnitType)).toBe(true);
-    expect(typesEqual(t.cod, UnitType)).toBe(true);
+    expect(typesEqual(t.cod, CompilingTS)).toBe(true);
   });
 
-  it('trace with wrong state type throws', () => {
-    const body = morphism('f', RawText, ValidJSON, { kind: 'agent', prompt: '' });
+  it('trace rejects non-sum codomain', () => {
+    // body: (RawText ⊗ ValidJSON) -> (CompilingTS ⊗ ValidJSON) -- product codomain, not sum
+    const dom = productType([RawText, ValidJSON]);
+    const cod = productType([CompilingTS, ValidJSON]);
+    const body = morphism('f', dom, cod, { kind: 'agent', prompt: '' });
+    expect(() => inferType(trace(ValidJSON, null, body))).toThrow(TypeError);
+    expect(() => inferType(trace(ValidJSON, null, body))).toThrow(/not a sum type/);
+  });
+
+  it('trace rejects when state type not in domain', () => {
+    const cod = sumType(CompilingTS, ValidJSON);
+    const body = morphism('f', RawText, cod, { kind: 'agent', prompt: '' });
     expect(() => inferType(trace(CompilingTS, null, body))).toThrow(TypeError);
+    expect(() => inferType(trace(CompilingTS, null, body))).toThrow(/product factor/);
+  });
+
+  it('trace rejects when state type not in sum codomain', () => {
+    const dom = productType([RawText, ValidJSON]);
+    const cod = sumType(CompilingTS, RawText); // right branch is RawText, not ValidJSON
+    const body = morphism('f', dom, cod, { kind: 'agent', prompt: '' });
+    expect(() => inferType(trace(ValidJSON, null, body))).toThrow(TypeError);
+    expect(() => inferType(trace(ValidJSON, null, body))).toThrow(/not a sum type/);
+  });
+
+  it('retry loop pattern: compose(prompt, validate) with error feedback', () => {
+    // The canonical trace pattern from the architecture:
+    //   trace(Error, null, compose(prompt_agent, validate))
+    //   body: TaskDesc ⊗ Error -> ValidOutput + Error
+    //   trace: TaskDesc -> ValidOutput
+    const TaskDesc: ArtifactType = { name: 'TaskDesc', validator: { kind: 'none' } };
+    const ErrorCtx: ArtifactType = { name: 'ErrorCtx', validator: { kind: 'none' } };
+    const ValidOutput: ArtifactType = {
+      name: 'ValidOutput',
+      validator: { kind: 'command', command: 'tsc', args: ['--noEmit'], expectedExit: 0 },
+    };
+
+    const promptDom = productType([TaskDesc, ErrorCtx]);
+    const promptCod: ArtifactType = { name: 'RawOutput', validator: { kind: 'none' } };
+    const prompt_agent = morphism('prompt_agent', promptDom, promptCod, { kind: 'agent', prompt: 'generate code' });
+
+    const validateCod = sumType(ValidOutput, ErrorCtx);
+    const validate_step = morphism('validate', promptCod, validateCod, { kind: 'tool', command: 'tsc', args: [] });
+
+    const body = compose(prompt_agent, validate_step);
+    const t = inferType(trace(ErrorCtx, null, body));
+    expect(typesEqual(t.dom, TaskDesc)).toBe(true);
+    expect(typesEqual(t.cod, ValidOutput)).toBe(true);
   });
 });

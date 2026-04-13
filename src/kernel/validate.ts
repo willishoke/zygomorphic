@@ -73,5 +73,21 @@ export async function validate(spec: ValidatorSpec, artifact: unknown): Promise<
       }
       return { passed: true };
     }
+
+    case 'sum': {
+      // Sum validation: artifact must satisfy either left or right
+      const leftResult = await validate(spec.left, artifact);
+      if (leftResult.passed) return { passed: true };
+      const rightResult = await validate(spec.right, artifact);
+      if (rightResult.passed) return { passed: true };
+      return {
+        passed: false,
+        errors: [
+          'Neither branch of sum type satisfied:',
+          ...(leftResult.errors ?? []).map(e => `  left: ${e}`),
+          ...(rightResult.errors ?? []).map(e => `  right: ${e}`),
+        ],
+      };
+    }
   }
 }
