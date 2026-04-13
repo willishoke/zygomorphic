@@ -30,13 +30,12 @@ function makeRecordingExecutor(log: string[]) {
 describe('LiveFactoringTable.factor — type boundary validation', () => {
   it('accepts a replacement with matching dom/cod', () => {
     const table = new LiveFactoringTable();
-    const original = morphism('gen', Raw, JSON_, { kind: 'agent', prompt: 'gen' });
     const replacement = compose(
       morphism('step1', Raw, JSON_, { kind: 'agent', prompt: 'step1' }),
       morphism('step2', JSON_, JSON_, { kind: 'tool', command: 'step2', args: [] }),
     );
     expect(() =>
-      table.factor('gen', replacement, { dom: original.dom, cod: original.cod })
+      table.factor('gen', replacement, { dom: Raw, cod: JSON_ })
     ).not.toThrow();
   });
 
