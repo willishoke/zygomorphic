@@ -1,8 +1,8 @@
-export type { ArtifactType, ValidatorSpec, MorphismBody, Autonomy, Term } from './types.js';
-export { id, morphism, compose, tensor, trace, composeAll, tensorAll, UnitType, productType, sumType, isUnit, isSumType, typeToString } from './types.js';
+export type { ArtifactType, ValidatorSpec, MorphismBody, Autonomy, Term, Artifact, BodyExecutor, SumValue } from './types.js';
+export { id, morphism, compose, tensor, trace, composeAll, tensorAll, UnitType, productType, sumType, isUnit, isSumType, isSumValue, left, right, typeToString } from './types.js';
 export type { MorphismType } from './type-check.js';
 export { typesEqual, inferType, typeCheck, TypeError } from './type-check.js';
-export type { Artifact, ExecutionNode, BodyExecutor } from './executor.js';
+export type { ExecutionNode } from './executor.js';
 export { buildGraph, execute } from './executor.js';
 export type { ValidationResult } from './validate.js';
 export { validate } from './validate.js';
@@ -18,8 +18,8 @@ export { id2, factor, fuse, vertical, horizontal, rewriteSource, rewriteTarget, 
 export type { CellOps } from './cell-ops.js';
 export { checkCompose, cellBoundary, isIdentity, CellTypeError } from './cell-ops.js';
 export { termOps, rewriteOps } from './cell-ops-instances.js';
-export type { Artifact as SignalArtifact, SumValue, BodyExecutor as SignalBodyExecutor, ExecutionOptions } from './signal-executor.js';
-export { signalExecute, isSumValue, ExecutionError } from './signal-executor.js';
+export type { ExecutionOptions } from './signal-executor.js';
+export { signalExecute, ExecutionError, EscalationError, FactoringError, LiveFactoringTable } from './signal-executor.js';
 export type { HumanFeedback, ApproveGate } from './autonomy.js';
 export { createGate, resolveGate, escalate, canProceed, requiresHuman } from './autonomy.js';
 export type { MorphismStatus, MorphismData } from './morphism-store.js';

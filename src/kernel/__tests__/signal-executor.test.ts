@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { signalExecute, ExecutionError } from '../signal-executor.js';
+import { signalExecute, ExecutionError, EscalationError } from '../signal-executor.js';
 import type { Artifact, BodyExecutor, SumValue } from '../signal-executor.js';
 import { morphism, compose, tensor, trace, id, productType, sumType, UnitType } from '../types.js';
 import type { ArtifactType } from '../types.js';
@@ -264,7 +264,7 @@ describe('signalExecute — trace (conditional retry)', () => {
     const input: Artifact = { type: RawText, value: 'task' };
 
     await expect(
-      signalExecute(t, input, infiniteExecutor, { maxTraceIterations: 5 }),
+      signalExecute(t, input, infiniteExecutor, { maxTraceIterations: 5, escalationThreshold: 10 }),
     ).rejects.toThrow(/did not converge after 5 iterations/);
   });
 
@@ -283,6 +283,80 @@ describe('signalExecute — trace (conditional retry)', () => {
     const input: Artifact = { type: RawText, value: 'task' };
 
     await expect(signalExecute(t, input, badExecutor)).rejects.toThrow(/SumValue/);
+  });
+});
+
+// --- Escalation ---
+
+describe('signalExecute — escalation', () => {
+  const S: ArtifactType = { name: 'S', validator: { kind: 'none' } };
+  const B: ArtifactType = { name: 'B', validator: { kind: 'schema' } };
+
+  function makeBody() {
+    const bodyDom = productType([RawText, S]);
+    const bodyCod = sumType(B, S);
+    return morphism('diverge', bodyDom, bodyCod, { kind: 'agent', prompt: 'loop' });
+  }
+
+  const neverExitExecutor: BodyExecutor = async () =>
+    ({ tag: 'right', value: 'still going' } as SumValue);
+
+  it('throws EscalationError when threshold is reached', async () => {
+    const body = makeBody();
+    const input: Artifact = { type: RawText, value: 'task' };
+
+    await expect(
+      signalExecute(
+        trace(S, null, body),
+        input,
+        neverExitExecutor,
+        { maxTraceIterations: 20, escalationThreshold: 5 },
+      ),
+    ).rejects.toThrow(EscalationError);
+  });
+
+  it('EscalationError carries iteration count and current state', async () => {
+    const body = makeBody();
+    const input: Artifact = { type: RawText, value: 'task' };
+
+    let caught: EscalationError | null = null;
+    try {
+      await signalExecute(
+        trace(S, 'initial-state', body),
+        input,
+        neverExitExecutor,
+        { maxTraceIterations: 20, escalationThreshold: 3 },
+      );
+    } catch (e) {
+      if (e instanceof EscalationError) caught = e;
+    }
+
+    expect(caught).not.toBeNull();
+    expect(caught!.iterations).toBe(3);
+    // State after 3 right-injections is still 'still going' (last right value)
+    expect(caught!.currentState).toBe('still going');
+  });
+
+  it('does not escalate when convergence happens before threshold', async () => {
+    const body = makeBody();
+    const input: Artifact = { type: RawText, value: 'task' };
+    let attempts = 0;
+
+    const convergesAtTwo: BodyExecutor = async () => {
+      attempts++;
+      if (attempts < 2) return { tag: 'right', value: 'retry' } as SumValue;
+      return { tag: 'left', value: '{}' } as SumValue;
+    };
+
+    const result = await signalExecute(
+      trace(S, null, body),
+      input,
+      convergesAtTwo,
+      { maxTraceIterations: 20, escalationThreshold: 5 },
+    );
+
+    expect(attempts).toBe(2);
+    expect(result.value).toBe('{}');
   });
 });
 

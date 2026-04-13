@@ -101,6 +101,38 @@ export function typeToString(t: ArtifactType): string {
   return t.name;
 }
 
+// --- Runtime sum injection ---
+
+/** Tagged value for sum-type outputs. Left exits a trace; right feeds back. */
+export type SumValue =
+  | { tag: 'left'; value: unknown }
+  | { tag: 'right'; value: unknown }
+
+export const left = (value: unknown): SumValue => ({ tag: 'left', value });
+export const right = (value: unknown): SumValue => ({ tag: 'right', value });
+
+export function isSumValue(x: unknown): x is SumValue {
+  return (
+    typeof x === 'object' && x !== null && 'tag' in x
+    && ((x as { tag: unknown }).tag === 'left' || (x as { tag: unknown }).tag === 'right')
+    && 'value' in x
+  );
+}
+
+// --- Runtime artifact and executor ---
+
+/** A typed value in the execution engine. */
+export interface Artifact {
+  type: ArtifactType;
+  value: unknown;
+}
+
+/**
+ * Execute a morphism body given an input artifact.
+ * For trace bodies (sum-type codomain), must return a SumValue.
+ */
+export type BodyExecutor = (body: MorphismBody, input: Artifact) => Promise<unknown>;
+
 // --- Morphisms (1-cells): Terms ---
 
 export type MorphismBody =
