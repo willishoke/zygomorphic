@@ -12,9 +12,11 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { Ajv } from 'ajv';
 import type { ValidatorSpec } from './types.js';
 
 const execFileAsync = promisify(execFile);
+const ajv = new Ajv();
 
 export interface ValidationResult {
   passed: boolean;
@@ -34,8 +36,13 @@ export async function validate(spec: ValidatorSpec, artifact: unknown): Promise<
         return { passed: false, errors: ['Expected string artifact for JSON validation'] };
       }
       try {
-        JSON.parse(artifact);
-        // TODO: validate against spec.schema (JSON Schema) when present
+        const parsed = JSON.parse(artifact);
+        if (spec.schema) {
+          const valid = ajv.validate(spec.schema, parsed);
+          if (!valid) {
+            return { passed: false, errors: ajv.errors!.map(err => `${err.instancePath} ${err.message}`) };
+          }
+        }
         return { passed: true };
       } catch (e) {
         return { passed: false, errors: [(e as Error).message] };
