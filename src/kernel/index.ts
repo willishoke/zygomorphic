@@ -19,7 +19,7 @@ export type { CellOps } from './cell-ops.js';
 export { checkCompose, cellBoundary, isIdentity, CellTypeError } from './cell-ops.js';
 export { termOps, rewriteOps } from './cell-ops-instances.js';
 export type { ExecutionOptions } from './signal-executor.js';
-export { signalExecute, ExecutionError, EscalationError } from './signal-executor.js';
+export { signalExecute, ExecutionError, EscalationError, FactoringError, LiveFactoringTable } from './signal-executor.js';
 export type { HumanFeedback, ApproveGate } from './autonomy.js';
 export { createGate, resolveGate, escalate, canProceed, requiresHuman } from './autonomy.js';
 export type { MorphismStatus, MorphismData } from './morphism-store.js';

@@ -19,7 +19,7 @@
 
 import type { ArtifactType, Term, Artifact, BodyExecutor, SumValue } from './types.js';
 import { productType, isSumValue } from './types.js';
-import { inferType } from './type-check.js';
+import { inferType, typesEqual } from './type-check.js';
 import { validate } from './validate.js';
 import { escalate } from './autonomy.js';
 
@@ -36,6 +36,77 @@ export interface ExecutionOptions {
    * Default: half of maxTraceIterations.
    */
   escalationThreshold?: number;
+  /**
+   * Live factoring table. When a morphism has an active forwarding pointer,
+   * its execution is redirected to the replacement term. Append-only and
+   * lock-free: in-flight morphisms complete normally; only future invocations
+   * of the factored name see the new routing.
+   */
+  liveFactoring?: LiveFactoringTable;
+}
+
+// --- Live factoring ---
+
+/**
+ * A runtime forwarding table for mid-execution factoring.
+ *
+ * Maps morphism names to replacement terms. Before firing a morphism,
+ * the executor checks this table. If a pointer exists, the replacement
+ * term is executed in place of the original body.
+ *
+ * Type boundaries are validated at factor() time, not execution time,
+ * so redirected execution always preserves the morphism's typed interface.
+ *
+ * Rewind is localized: rewind(name) removes the pointer; subsequent
+ * invocations revert to the original body.
+ */
+export class LiveFactoringTable {
+  private readonly table = new Map<string, Term>();
+
+  /**
+   * Register a forwarding pointer for morphismName.
+   * replacement must have the same domain and codomain as declared in boundary.
+   */
+  factor(
+    morphismName: string,
+    replacement: Term,
+    boundary: { dom: ArtifactType; cod: ArtifactType },
+  ): void {
+    const replType = inferType(replacement);
+    if (!typesEqual(replType.dom, boundary.dom)) {
+      throw new FactoringError(
+        `Live factoring of "${morphismName}": replacement domain "${replType.dom.name}" `
+        + `does not match expected "${boundary.dom.name}"`,
+      );
+    }
+    if (!typesEqual(replType.cod, boundary.cod)) {
+      throw new FactoringError(
+        `Live factoring of "${morphismName}": replacement codomain "${replType.cod.name}" `
+        + `does not match expected "${boundary.cod.name}"`,
+      );
+    }
+    this.table.set(morphismName, replacement);
+  }
+
+  /** Remove the forwarding pointer. Subsequent invocations use the original body. */
+  rewind(morphismName: string): void {
+    this.table.delete(morphismName);
+  }
+
+  /** Return the replacement term if one is registered, else undefined. */
+  get(morphismName: string): Term | undefined {
+    return this.table.get(morphismName);
+  }
+
+  /** Whether a forwarding pointer is active for this name. */
+  isActive(morphismName: string): boolean {
+    return this.table.has(morphismName);
+  }
+
+  /** Number of active forwarding pointers. */
+  get size(): number {
+    return this.table.size;
+  }
 }
 
 // --- Signal/slot executor ---
@@ -64,6 +135,13 @@ export async function signalExecute(
         return inp;
 
       case 'morphism': {
+        // Forwarding pointer: if this morphism has been factored at runtime,
+        // redirect to the replacement term. In-flight invocations (already
+        // past this check) complete normally — only future calls are redirected.
+        const forwarded = options.liveFactoring?.get(t.name);
+        if (forwarded) {
+          return exec(forwarded, inp);
+        }
         const rawOutput = await bodyExecutor(t.body, inp);
         await validateOutput(t.name, t.cod, rawOutput);
         return { type: t.cod, value: rawOutput };
@@ -159,6 +237,13 @@ export async function signalExecute(
 
 export class ExecutionError extends Error {
   override name = 'ExecutionError';
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class FactoringError extends Error {
+  override name = 'FactoringError';
   constructor(message: string) {
     super(message);
   }
