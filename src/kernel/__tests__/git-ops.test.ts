@@ -17,6 +17,8 @@ function git(args: string): string {
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zyg-git-test-'));
   git('init');
+  git('config user.email "test@zyg.test"');
+  git('config user.name "Zyg Test"');
   git('checkout -b main');
   // Need at least one commit to branch from
   fs.writeFileSync(path.join(tmpDir, 'README.md'), '# test');
